@@ -1,0 +1,181 @@
+import type { State, Post } from "../src/types.ts";
+export function seedState(): State {
+  const users = [
+    {
+      id: "alex",
+      name: "Alex Morgan",
+      handle: "alex",
+      bio: "Collecting good ideas. Connecting the dots.",
+      color: "sage",
+    },
+    {
+      id: "maya",
+      name: "Maya Patel",
+      handle: "maya",
+      bio: "Design, books, and everything in between.",
+      color: "peach",
+    },
+    {
+      id: "james",
+      name: "James Wilson",
+      handle: "james",
+      bio: "Building things that make life simpler.",
+      color: "blue",
+    },
+    {
+      id: "sarah",
+      name: "Sarah Chen",
+      handle: "sarah",
+      bio: "A little more curious every day.",
+      color: "lavender",
+    },
+    {
+      id: "omar",
+      name: "Omar Hassan",
+      handle: "omar",
+      bio: "Always have a book recommendation.",
+      color: "sand",
+    },
+    {
+      id: "nina",
+      name: "Nina Park",
+      handle: "nina",
+      bio: "Learning in public. Sharing in private.",
+      color: "peach",
+    },
+  ];
+  const groups = [
+    {
+      id: "design",
+      name: "Design circle",
+      description:
+        "Good design, thoughtful feedback, and things that make us look twice.",
+      ownerId: "maya",
+      memberIds: ["alex", "maya", "james", "sarah"],
+      color: "peach",
+      icon: "palette",
+    },
+    {
+      id: "builders",
+      name: "The builders club",
+      description:
+        "A place for side projects, useful tools, and small breakthroughs.",
+      ownerId: "alex",
+      memberIds: ["alex", "james", "nina"],
+      color: "sage",
+      icon: "blocks",
+    },
+    {
+      id: "reads",
+      name: "Good reads",
+      description: "Books, essays, and rabbit holes worth your time.",
+      ownerId: "omar",
+      memberIds: ["alex", "maya", "omar", "nina", "sarah"],
+      color: "lavender",
+      icon: "book",
+    },
+  ];
+  const ago = (hours: number) =>
+    new Date(Date.now() - hours * 3600000).toISOString();
+  const base = {
+    votes: [],
+    savedBy: [],
+    comments: [],
+    type: "note" as const,
+    tags: [],
+  };
+  const posts: Post[] = [
+    {
+      ...base,
+      id: "design-note",
+      authorId: "maya",
+      audienceType: "group",
+      audienceId: "design",
+      title: "The best design decision is sometimes subtraction.",
+      body: "I removed three steps from our onboarding today. No new features, no clever UI. Just fewer things between someone and what they came to do.\n\nA good reminder: clarity is a feature, too.",
+      tags: ["design", "lessbutbetter"],
+      createdAt: ago(0.5),
+      votes: ["james", "sarah"],
+      comments: [
+        {
+          id: "c1",
+          authorId: "james",
+          body: "The simplest solutions always take the most thought. Love this.",
+          createdAt: ago(0.3),
+        },
+      ],
+    },
+    {
+      ...base,
+      id: "read-link",
+      authorId: "omar",
+      audienceType: "group",
+      audienceId: "reads",
+      title: "A thoughtful read on making time for what matters.",
+      body: "The idea that stuck with me: you don’t need to fit more into your day. You need to decide what deserves to be there.",
+      type: "link",
+      url: "https://www.oliverburkeman.com/books",
+      tags: ["books", "productivity"],
+      createdAt: ago(2),
+      votes: ["maya", "alex", "nina"],
+      savedBy: ["alex"],
+    },
+    {
+      ...base,
+      id: "builder-question",
+      authorId: "james",
+      audienceType: "group",
+      audienceId: "builders",
+      title: "What’s one small tool you couldn’t work without?",
+      body: "Looking for the quiet little tools that make a real difference. Mine is a plain text file for the one thing I need to get done each day.",
+      type: "question",
+      tags: ["tools", "workflow"],
+      createdAt: ago(4),
+      votes: ["nina"],
+      comments: [
+        {
+          id: "c2",
+          authorId: "nina",
+          body: "A clipboard manager. Such a small thing, such a big difference.",
+          createdAt: ago(3),
+        },
+      ],
+    },
+    {
+      ...base,
+      id: "personal-note",
+      authorId: "alex",
+      audienceType: "self",
+      audienceId: "alex",
+      title: "A few things I want to remember this week.",
+      body: "Leave room for curiosity. Write things down before they disappear. Share the good stuff with the people who will appreciate it.",
+      tags: ["notes", "learning"],
+      createdAt: ago(7),
+    },
+    {
+      ...base,
+      id: "direct-note",
+      authorId: "sarah",
+      audienceType: "user",
+      audienceId: "alex",
+      title: "That reading list we talked about",
+      body: "Start with The Creative Act by Rick Rubin, then try A Philosophy of Walking. Both made me slow down in the best way.",
+      tags: ["books", "creativity"],
+      createdAt: ago(12),
+      savedBy: ["alex"],
+    },
+    {
+      ...base,
+      id: "group-note",
+      authorId: "alex",
+      audienceType: "group",
+      audienceId: "builders",
+      title: "A tiny experiment: a week of building before scrolling.",
+      body: "Keeping the first 30 minutes of the day for making something. A sketch, a paragraph, a little bit of code. Anyone want to join?",
+      tags: ["building", "habits"],
+      createdAt: ago(25),
+      votes: ["james", "nina"],
+    },
+  ];
+  return { users, groups, posts };
+}

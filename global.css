@@ -1,0 +1,110 @@
+@import "tailwindcss";
+@import "uniwind";
+@layer theme {
+  .light {
+    --primary: 39 79 63;
+    --primary-foreground: 255 255 255;
+    --card: 255 255 255;
+    --secondary: 239 241 234;
+    --secondary-foreground: 39 79 63;
+    --background: 249 249 245;
+    --foreground: 35 43 36;
+    --popover: 255 255 255;
+    --popover-foreground: 35 43 36;
+    --muted: 242 243 237;
+    --muted-foreground: 105 113 105;
+    --destructive: 166 59 49;
+    --border: 228 231 222;
+    --input: 228 231 222;
+    --ring: 78 115 88;
+    --accent: 232 238 226;
+    --accent-foreground: 39 79 63;
+  }
+  .dark {
+    --primary: 176 208 172;
+    --primary-foreground: 22 42 30;
+    --card: 31 39 33;
+    --secondary: 40 52 43;
+    --secondary-foreground: 221 232 220;
+    --background: 22 29 24;
+    --foreground: 235 238 229;
+    --popover: 31 39 33;
+    --popover-foreground: 235 238 229;
+    --muted: 40 52 43;
+    --muted-foreground: 169 181 168;
+    --destructive: 242 151 136;
+    --border: 58 72 60;
+    --input: 58 72 60;
+    --ring: 176 208 172;
+    --accent: 40 59 44;
+    --accent-foreground: 221 232 220;
+  }
+}
+@theme inline {
+  --font-sans: "DMSans_400Regular", sans-serif;
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-card: rgb(var(--card));
+  --color-secondary: rgb(var(--secondary));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --color-popover: rgb(var(--popover));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-destructive: rgb(var(--destructive));
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+  --color-ring: rgb(var(--ring));
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+}
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  [role="button"] {
+    transition:
+      background-color 180ms ease-out,
+      border-color 180ms ease-out,
+      opacity 180ms ease-out;
+  }
+}
+html,
+body,
+#root {
+  height: 100%;
+  background: #f9f9f5;
+}
+body {
+  margin: 0;
+}
+::selection {
+  background: #d6e3ca;
+  color: #234735;
+}
+:focus-visible {
+  outline: 2px solid #527453 !important;
+  outline-offset: 4px;
+}
+input,
+textarea {
+  caret-color: #274f3f;
+}
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d6dbcf;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+a {
+  text-underline-offset: 3px;
+}

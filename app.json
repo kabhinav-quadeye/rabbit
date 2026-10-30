@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Rabbit",
+    "slug": "rabbit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2F5843",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "Rabbit \u2014 your private corner",
+      "shortName": "Rabbit",
+      "backgroundColor": "#F8F9F4",
+      "themeColor": "#2F5843"
+    },
+    "plugins": ["expo-font", "expo-secure-store"],
+    "scheme": "rabbit"
+  }
+}

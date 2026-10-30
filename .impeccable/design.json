@@ -1,0 +1,493 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T11:29:49.362477+00:00",
+  "title": "Design System: Rabbit",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary",
+        "tonalRamp": [
+          "oklch(15% 0.0146 160.14)",
+          "oklch(27% 0.0322 160.14)",
+          "oklch(39% 0.0469 160.14)",
+          "oklch(51% 0.0586 160.14)",
+          "oklch(63% 0.0586 160.14)",
+          "oklch(75% 0.0469 160.14)",
+          "oklch(87% 0.0293 160.14)",
+          "oklch(95% 0.0117 160.14)"
+        ]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Neutral Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0017 115.70)",
+          "oklch(27% 0.0037 115.70)",
+          "oklch(39% 0.0053 115.70)",
+          "oklch(51% 0.0067 115.70)",
+          "oklch(63% 0.0067 115.70)",
+          "oklch(75% 0.0053 115.70)",
+          "oklch(87% 0.0033 115.70)",
+          "oklch(95% 0.0013 115.70)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(27% 0.0000 89.88)",
+          "oklch(39% 0.0000 89.88)",
+          "oklch(51% 0.0000 89.88)",
+          "oklch(63% 0.0000 89.88)",
+          "oklch(75% 0.0000 89.88)",
+          "oklch(87% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0049 163.36)",
+          "oklch(27% 0.0107 163.36)",
+          "oklch(39% 0.0156 163.36)",
+          "oklch(51% 0.0194 163.36)",
+          "oklch(63% 0.0194 163.36)",
+          "oklch(75% 0.0156 163.36)",
+          "oklch(87% 0.0097 163.36)",
+          "oklch(95% 0.0039 163.36)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0036 149.09)",
+          "oklch(27% 0.0079 149.09)",
+          "oklch(39% 0.0115 149.09)",
+          "oklch(51% 0.0144 149.09)",
+          "oklch(63% 0.0144 149.09)",
+          "oklch(75% 0.0115 149.09)",
+          "oklch(87% 0.0072 149.09)",
+          "oklch(95% 0.0029 149.09)"
+        ]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint",
+        "tonalRamp": [
+          "oklch(15% 0.0041 136.11)",
+          "oklch(27% 0.0091 136.11)",
+          "oklch(39% 0.0132 136.11)",
+          "oklch(51% 0.0165 136.11)",
+          "oklch(63% 0.0165 136.11)",
+          "oklch(75% 0.0132 136.11)",
+          "oklch(87% 0.0083 136.11)",
+          "oklch(95% 0.0033 136.11)"
+        ]
+      },
+      "green-light": {
+        "role": "primary",
+        "displayName": "Green Light",
+        "tonalRamp": [
+          "oklch(15% 0.0046 127.15)",
+          "oklch(27% 0.0101 127.15)",
+          "oklch(39% 0.0147 127.15)",
+          "oklch(51% 0.0184 127.15)",
+          "oklch(63% 0.0184 127.15)",
+          "oklch(75% 0.0147 127.15)",
+          "oklch(87% 0.0092 127.15)",
+          "oklch(95% 0.0037 127.15)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% 0.0034 120.29)",
+          "oklch(27% 0.0075 120.29)",
+          "oklch(39% 0.0110 120.29)",
+          "oklch(51% 0.0137 120.29)",
+          "oklch(63% 0.0137 120.29)",
+          "oklch(75% 0.0110 120.29)",
+          "oklch(87% 0.0069 120.29)",
+          "oklch(95% 0.0027 120.29)"
+        ]
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar",
+        "tonalRamp": [
+          "oklch(15% 0.0027 118.02)",
+          "oklch(27% 0.0059 118.02)",
+          "oklch(39% 0.0086 118.02)",
+          "oklch(51% 0.0108 118.02)",
+          "oklch(63% 0.0108 118.02)",
+          "oklch(75% 0.0086 118.02)",
+          "oklch(87% 0.0054 118.02)",
+          "oklch(95% 0.0022 118.02)"
+        ]
+      },
+      "peach": {
+        "role": "secondary",
+        "displayName": "Peach",
+        "tonalRamp": [
+          "oklch(15% 0.0053 60.74)",
+          "oklch(27% 0.0117 60.74)",
+          "oklch(39% 0.0170 60.74)",
+          "oklch(51% 0.0212 60.74)",
+          "oklch(63% 0.0212 60.74)",
+          "oklch(75% 0.0170 60.74)",
+          "oklch(87% 0.0106 60.74)",
+          "oklch(95% 0.0042 60.74)"
+        ]
+      },
+      "lavender": {
+        "role": "secondary",
+        "displayName": "Lavender",
+        "tonalRamp": [
+          "oklch(15% 0.0041 301.21)",
+          "oklch(27% 0.0091 301.21)",
+          "oklch(39% 0.0133 301.21)",
+          "oklch(51% 0.0166 301.21)",
+          "oklch(63% 0.0166 301.21)",
+          "oklch(75% 0.0133 301.21)",
+          "oklch(87% 0.0083 301.21)",
+          "oklch(95% 0.0033 301.21)"
+        ]
+      },
+      "sage": {
+        "role": "secondary",
+        "displayName": "Sage",
+        "tonalRamp": [
+          "oklch(15% 0.0054 130.02)",
+          "oklch(27% 0.0119 130.02)",
+          "oklch(39% 0.0174 130.02)",
+          "oklch(51% 0.0217 130.02)",
+          "oklch(63% 0.0217 130.02)",
+          "oklch(75% 0.0174 130.02)",
+          "oklch(87% 0.0108 130.02)",
+          "oklch(95% 0.0043 130.02)"
+        ]
+      },
+      "blue": {
+        "role": "secondary",
+        "displayName": "Blue",
+        "tonalRamp": [
+          "oklch(15% 0.0030 239.91)",
+          "oklch(27% 0.0065 239.91)",
+          "oklch(39% 0.0094 239.91)",
+          "oklch(51% 0.0118 239.91)",
+          "oklch(63% 0.0118 239.91)",
+          "oklch(75% 0.0094 239.91)",
+          "oklch(87% 0.0059 239.91)",
+          "oklch(95% 0.0024 239.91)"
+        ]
+      },
+      "sand": {
+        "role": "secondary",
+        "displayName": "Sand",
+        "tonalRamp": [
+          "oklch(15% 0.0067 95.35)",
+          "oklch(27% 0.0148 95.35)",
+          "oklch(39% 0.0216 95.35)",
+          "oklch(51% 0.0269 95.35)",
+          "oklch(63% 0.0269 95.35)",
+          "oklch(75% 0.0216 95.35)",
+          "oklch(87% 0.0135 95.35)",
+          "oklch(95% 0.0054 95.35)"
+        ]
+      },
+      "sage-ink": {
+        "role": "secondary",
+        "displayName": "Sage Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0159 137.24)",
+          "oklch(27% 0.0350 137.24)",
+          "oklch(39% 0.0509 137.24)",
+          "oklch(51% 0.0636 137.24)",
+          "oklch(63% 0.0636 137.24)",
+          "oklch(75% 0.0509 137.24)",
+          "oklch(87% 0.0318 137.24)",
+          "oklch(95% 0.0127 137.24)"
+        ]
+      },
+      "peach-ink": {
+        "role": "secondary",
+        "displayName": "Peach Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0215 54.85)",
+          "oklch(27% 0.0473 54.85)",
+          "oklch(39% 0.0688 54.85)",
+          "oklch(51% 0.0861 54.85)",
+          "oklch(63% 0.0861 54.85)",
+          "oklch(75% 0.0688 54.85)",
+          "oklch(87% 0.0430 54.85)",
+          "oklch(95% 0.0172 54.85)"
+        ]
+      },
+      "lavender-ink": {
+        "role": "secondary",
+        "displayName": "Lavender Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0212 302.72)",
+          "oklch(27% 0.0466 302.72)",
+          "oklch(39% 0.0677 302.72)",
+          "oklch(51% 0.0846 302.72)",
+          "oklch(63% 0.0846 302.72)",
+          "oklch(75% 0.0677 302.72)",
+          "oklch(87% 0.0423 302.72)",
+          "oklch(95% 0.0169 302.72)"
+        ]
+      },
+      "blue-ink": {
+        "role": "secondary",
+        "displayName": "Blue Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0143 248.98)",
+          "oklch(27% 0.0315 248.98)",
+          "oklch(39% 0.0458 248.98)",
+          "oklch(51% 0.0573 248.98)",
+          "oklch(63% 0.0573 248.98)",
+          "oklch(75% 0.0458 248.98)",
+          "oklch(87% 0.0286 248.98)",
+          "oklch(95% 0.0115 248.98)"
+        ]
+      },
+      "sand-ink": {
+        "role": "secondary",
+        "displayName": "Sand Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0217 90.28)",
+          "oklch(27% 0.0476 90.28)",
+          "oklch(39% 0.0693 90.28)",
+          "oklch(51% 0.0866 90.28)",
+          "oklch(63% 0.0866 90.28)",
+          "oklch(75% 0.0693 90.28)",
+          "oklch(87% 0.0433 90.28)",
+          "oklch(95% 0.0173 90.28)"
+        ]
+      },
+      "error": {
+        "role": "neutral",
+        "displayName": "Error",
+        "tonalRamp": [
+          "oklch(15% 0.0358 28.54)",
+          "oklch(27% 0.0787 28.54)",
+          "oklch(39% 0.1145 28.54)",
+          "oklch(51% 0.1431 28.54)",
+          "oklch(63% 0.1431 28.54)",
+          "oklch(75% 0.1145 28.54)",
+          "oklch(87% 0.0716 28.54)",
+          "oklch(95% 0.0286 28.54)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% 0.0161 145.30)",
+          "oklch(27% 0.0354 145.30)",
+          "oklch(39% 0.0515 145.30)",
+          "oklch(51% 0.0644 145.30)",
+          "oklch(63% 0.0644 145.30)",
+          "oklch(75% 0.0515 145.30)",
+          "oklch(87% 0.0322 145.30)",
+          "oklch(95% 0.0129 145.30)"
+        ]
+      },
+      "chip-selected-border": {
+        "role": "neutral",
+        "displayName": "Chip Selected Border",
+        "tonalRamp": [
+          "oklch(15% 0.0080 128.87)",
+          "oklch(27% 0.0175 128.87)",
+          "oklch(39% 0.0255 128.87)",
+          "oklch(51% 0.0319 128.87)",
+          "oklch(63% 0.0319 128.87)",
+          "oklch(75% 0.0255 128.87)",
+          "oklch(87% 0.0159 128.87)",
+          "oklch(95% 0.0064 128.87)"
+        ]
+      },
+      "chip-hover": {
+        "role": "neutral",
+        "displayName": "Chip Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0034 120.28)",
+          "oklch(27% 0.0075 120.28)",
+          "oklch(39% 0.0109 120.28)",
+          "oklch(51% 0.0136 120.28)",
+          "oklch(63% 0.0136 120.28)",
+          "oklch(75% 0.0109 120.28)",
+          "oklch(87% 0.0068 120.28)",
+          "oklch(95% 0.0027 120.28)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Desktop page heading."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Phone page heading."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section and dialog heading."
+      },
+      "card-title": {
+        "displayName": "Card Title",
+        "purpose": "Post information heading."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "General reading text."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Supporting copy and metadata."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field and structural labels."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Action labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "secondary-library-shadow",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Existing Tailwind shadow-xs inherited by the outline button; not a card elevation tier."
+      }
+    ],
+    "motion": [
+      {
+        "name": "web-control-feedback",
+        "value": "background-color 180ms ease-out, border-color 180ms ease-out, opacity 180ms ease-out",
+        "purpose": "Button transitions only under prefers-reduced-motion: no-preference. Native dialog fade remains platform-provided."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "dialog-padding",
+        "value": "600px"
+      },
+      {
+        "name": "desktop-rail",
+        "value": "960px"
+      },
+      {
+        "name": "support-column",
+        "value": "1230px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Forest action with a quiet directional icon.",
+      "html": "<button class=\"ds-primary\">Post <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "css": ".ds-primary{font-family:'DMSans_500Medium',sans-serif;font-weight:500;font-size:13px;min-height:44px;padding:8px 18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;background:#2F5843;color:#FFFFFF;border:0}.ds-primary:hover,.ds-primary:active{background:#2F5843}.ds-primary:focus-visible{outline:2px solid #527453;outline-offset:4px;}.ds-primary:disabled{opacity:.5;cursor:default}@media(prefers-reduced-motion:no-preference){.ds-primary{transition:background-color 180ms ease-out,border-color 180ms ease-out,opacity 180ms ease-out}}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A bordered alternative with the same dimensions and fixed transparent app fill.",
+      "html": "<button class=\"ds-secondary\">Edit profile</button>",
+      "css": ".ds-secondary{font-family:'DMSans_500Medium',sans-serif;font-weight:500;font-size:13px;min-height:44px;padding:8px 18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;background:transparent;color:#27332D;border:1px solid #E5E8DE;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05)}.ds-secondary:hover,.ds-secondary:active{background:transparent}.ds-secondary:focus-visible{outline:2px solid #527453;outline-offset:4px;}"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "White outlined field with muted placeholder and visible keyboard focus.",
+      "html": "<label class=\"ds-field-label\">Group name<input class=\"ds-field\" placeholder=\"A name for your circle\"/></label>",
+      "css": ".ds-field-label{display:grid;gap:8px;font-family:'DMSans_600SemiBold',sans-serif;font-weight:600;font-size:13px;color:#27332D}.ds-field{font-family:'DMSans_400Regular',sans-serif;font-size:14px;color:#27332D;min-height:48px;padding:0 14px;border:1px solid #E5E8DE;border-radius:9px;background:#FFFFFF}.ds-field::placeholder{color:#6D756E;opacity:1}.ds-field:focus-visible{outline:2px solid #527453;outline-offset:4px;}"
+    },
+    {
+      "name": "Filter chips",
+      "kind": "chip",
+      "refersTo": "filter-chip",
+      "description": "Pale foliage denotes the selected scope; inactive filters stay quiet.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-active\" aria-pressed=\"true\">All posts</button><button class=\"ds-chip\" aria-pressed=\"false\">Groups</button></div>",
+      "css": ".ds-chips{display:flex;gap:8px;flex-wrap:wrap}.ds-chip{font-family:'DMSans_400Regular',sans-serif;font-size:12px;min-height:36px;padding:0 13px;border:1px solid #E5E8DE;border-radius:7px;background:transparent;color:#6D756E;cursor:pointer}.ds-chip:hover{background:#F0F3E9}.ds-chip-active,.ds-chip-active:hover{font-family:'DMSans_500Medium',sans-serif;font-weight:500;background:#E8EEE1;color:#2F5843;border-color:#D3DEC8}.ds-chip:focus-visible{outline:2px solid #527453;outline-offset:4px;}"
+    },
+    {
+      "name": "Desktop navigation item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "Selected forest text and pale foliage without decorative elevation.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Primary\"><button class=\"ds-nav-item\" aria-current=\"page\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><path d=\"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M16 3l5 5M9 15l3-1L22 4l-3-3L9 11z\"/></svg>Your space</button></nav>",
+      "css": ".ds-nav{background:#F1F3EB;padding:12px;max-width:190px}.ds-nav-item{font-family:'DMSans_600SemiBold',sans-serif;font-weight:600;font-size:13px;color:#2F5843;background:#E8EEE1;border:0;min-height:45px;padding:0 15px;border-radius:9px;display:flex;align-items:center;gap:12px;width:100%;cursor:pointer}.ds-nav-item:hover,.ds-nav-item:active{background:#E8EEE1}.ds-nav-item:focus-visible{outline:2px solid #527453;outline-offset:4px;}"
+    },
+    {
+      "name": "Information card",
+      "kind": "card",
+      "refersTo": "post-card",
+      "description": "Identity, informative title and useful excerpt lead a flat white post card.",
+      "html": "<article class=\"ds-post\"><div class=\"ds-post-meta\"><span class=\"ds-avatar\">MP</span><strong>Maya Patel</strong><span class=\"ds-post-audience\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/><circle cx=\"12\" cy=\"16\" r=\"1\"/><path d=\"M12 17v2\"/></svg>Design circle</span></div><button class=\"ds-post-title\">The best design decision is sometimes subtraction.</button><p class=\"ds-post-body\">I removed three steps from our onboarding today. Fewer things between someone and what they came to do.</p><div class=\"ds-post-footer\">2 useful <span>1 reply</span></div></article>",
+      "css": ".ds-post{font-family:'DMSans_400Regular',sans-serif;padding:22px;border:1px solid #E5E8DE;border-radius:16px;background:#FFFFFF;color:#27332D;display:grid;gap:14px}.ds-post-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px}.ds-post-meta strong{font-family:'DMSans_600SemiBold',sans-serif;font-weight:600;}.ds-avatar{font-family:'DMSans_600SemiBold',sans-serif;font-weight:600;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#F6E8DD;color:#99643F;font-size:10px}.ds-post-audience{font-family:'DMSans_500Medium',sans-serif;font-weight:500;display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:5px;background:#F6E8DD;color:#99643F;font-size:10px}.ds-post-title{font-family:'DMSans_600SemiBold',sans-serif;font-weight:600;font-size:19px;line-height:27px;letter-spacing:-.4px;color:#27332D;text-align:left;background:transparent;border:0;padding:0;cursor:pointer}.ds-post-title:focus-visible{outline:2px solid #527453;outline-offset:4px;}.ds-post-body{font-size:13px;line-height:22px;color:#697167;margin:0}.ds-post-footer{display:flex;gap:18px;font-size:11px;line-height:18px;color:#6D756E;border-top:1px solid #F0F1EB;padding-top:8px}"
+    },
+    {
+      "name": "Composer audience signature",
+      "kind": "custom",
+      "refersTo": "audience-self",
+      "description": "Three actual composer audience states demonstrate the coupled glyph, identity tint and privacy explanation. Examples use the demonstration names.",
+      "html": "<div class=\"ds-audiences\"><section class=\"ds-audience-state\"><button class=\"ds-audience ds-self\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/><circle cx=\"12\" cy=\"16\" r=\"1\"/><path d=\"M12 17v2\"/></svg>Just me <svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></button><p class=\"ds-privacy\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/><circle cx=\"12\" cy=\"16\" r=\"1\"/><path d=\"M12 17v2\"/></svg>Only you can see this</p></section><section class=\"ds-audience-state\"><button class=\"ds-audience ds-person\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"8\" r=\"5\"/><path d=\"M20 21a8 8 0 0 0-16 0\"/></svg>Maya Patel <svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></button><p class=\"ds-privacy\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/><circle cx=\"12\" cy=\"16\" r=\"1\"/><path d=\"M12 17v2\"/></svg>Only you and Maya</p></section><section class=\"ds-audience-state\"><button class=\"ds-audience ds-group\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><path d=\"M12 7v14M3 3h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5v17h-5a4 4 0 0 0-4 1 4 4 0 0 0-4-1H3z\"/></svg>Good reads <svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></button><p class=\"ds-privacy\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/><circle cx=\"12\" cy=\"16\" r=\"1\"/><path d=\"M12 17v2\"/></svg>Visible to 5 group members</p></section></div>",
+      "css": ".ds-audiences{display:grid;gap:20px}.ds-audience{font-family:'DMSans_500Medium',sans-serif;font-weight:500;font-size:12px;display:inline-flex;align-items:center;gap:7px;border:0;border-radius:7px;min-height:36px;padding:0 10px;max-width:240px;cursor:pointer}.ds-self{background:#E4ECDD;color:#4F6945}.ds-person{background:#F6E8DD;color:#99643F}.ds-group{background:#ECE8F4;color:#776196}.ds-audience:hover,.ds-audience:active{opacity:.85}.ds-audience:focus-visible{outline:2px solid #527453;outline-offset:4px;}.ds-privacy{font-family:'DMSans_400Regular',sans-serif;display:flex;align-items:center;gap:6px;font-size:11px;line-height:18px;color:#6D756E;margin:10px 0 0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Private Garden Club Bulletin",
+    "overview": "Rabbit is a calm writing and reading space for friends and small communities. Its warm paper ground, forest actions and softly colored circles make sharing feel personal and deliberate. DM Sans keeps the interface familiar and legible; information and recipients supply the character.\n\nThe interface is spacious around the primary task and compact around its supporting metadata. White panels, light strokes and quiet controls frame useful posts. The distinctive audience control changes its icon, tint and privacy explanation together before publication.",
+    "keyCharacteristics": [
+      "Warm paper ground with white reading and writing surfaces.",
+      "One forest action color and five consistent identity tones.",
+      "Readable DM Sans with compact, sentence-case controls.",
+      "Visible recipients and privacy wording before posting.",
+      "Flat panels and restrained state feedback."
+    ],
+    "rules": [
+      {
+        "name": "The Audience Agreement Rule",
+        "body": "In the composer, recipient glyph, identity tone and privacy explanation change together. A color change alone is insufficient.",
+        "section": "colors"
+      },
+      {
+        "name": "The Reading First Rule",
+        "body": "Use semibold titles, regular reading text and quieter metadata; keep action labels subordinate to the information they serve.",
+        "section": "typography"
+      },
+      {
+        "name": "The Paper Surface Rule",
+        "body": "Separate resting panels with a white fill and a light border. Do not add decorative elevation to reading cards.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the JS theme palette for app surfaces and the paired tone foregrounds for identity badges.",
+      "Do keep the composer audience visible and update its icon, tint and privacy wording together.",
+      "Do preserve actual DM Sans weight assets on web and native.",
+      "Do keep controls quiet, keyboard focus visible and explanatory text readable.",
+      "Do adapt the rail and support column to the observed breakpoints while preserving the three primary destinations."
+    ],
+    "donts": [
+      "Don't use group colors to replace the primary action color.",
+      "Don't add decorative shadows to reading cards.",
+      "Don't use the faint color for composer placeholders; use muted.",
+      "Don't treat the available dark token declarations as a shipped dark appearance.",
+      "Don't turn the existing uppercase sidebar category label into a reusable heading style."
+    ]
+  }
+}
