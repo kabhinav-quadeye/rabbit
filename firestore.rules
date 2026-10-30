@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function member(groupId) {
+      return signedIn() && me() in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+    }
+    function canRead(post) {
+      return signedIn() && (post.authorId == me()
+        || (post.audienceType == 'user' && post.audienceId == me())
+        || (post.audienceType == 'group' && member(post.audienceId)));
+    }
+    function text(value, limit) { return value is string && value.size() <= limit; }
+    function validUser(user, uid) {
+      return user.keys().hasAll(['id', 'name', 'handle', 'bio', 'color'])
+        && user.keys().hasOnly(['id', 'name', 'handle', 'bio', 'color', 'avatar'])
+        && user.id == uid && text(user.name, 60) && user.name.size() > 0
+        && text(user.handle, 254) && user.handle.size() > 0
+        && text(user.bio, 240) && user.color in ['sage', 'peach', 'lavender', 'blue', 'sand']
+        && (!('avatar' in user) || (text(user.avatar, 2000) && user.avatar.matches('https://.*')));
+    }
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if signedIn() && me() == uid && validUser(request.resource.data, uid);
+      allow update: if signedIn() && me() == uid && validUser(request.resource.data, uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'bio', 'avatar', 'color']);
+      allow delete: if signedIn() && me() == uid;
+    }
+    function validGroup(group, groupId) {
+      return group.keys().hasAll(['id', 'name', 'description', 'ownerId', 'memberIds', 'color', 'icon'])
+        && group.keys().hasOnly(['id', 'name', 'description', 'ownerId', 'memberIds', 'color', 'icon'])
+        && group.id == groupId && text(group.name, 60) && group.name.size() > 0
+        && text(group.description, 300) && group.memberIds is list
+        && group.memberIds.size() > 0 && group.memberIds.size() <= 100
+        && group.memberIds.toSet().size() == group.memberIds.size()
+        && group.ownerId in group.memberIds
+        && group.color in ['sage', 'peach', 'lavender', 'blue', 'sand']
+        && group.icon in ['users', 'palette', 'blocks', 'book'];
+    }
+    match /groups/{groupId} {
+      allow read: if signedIn() && me() in resource.data.memberIds;
+      allow create: if signedIn() && request.resource.data.ownerId == me()
+        && me() in request.resource.data.memberIds && validGroup(request.resource.data, groupId);
+      allow update: if signedIn() && me() in resource.data.memberIds
+        && validGroup(request.resource.data, groupId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+        && request.resource.data.memberIds.hasAll(resource.data.memberIds);
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+    function validPost(post, postId) {
+      return post.keys().hasAll(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'createdAt', 'votes', 'savedBy', 'comments'])
+        && post.keys().hasOnly(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'url', 'createdAt', 'votes', 'savedBy', 'comments'])
+        && post.id == postId && text(post.title, 180) && post.title.size() > 0
+        && text(post.body, 20000) && post.tags is list && post.tags.size() <= 6
+        && post.type in ['note', 'link', 'question'] && text(post.createdAt, 40)
+        && (post.type != 'link' || (text(post.url, 2000) && post.url.matches('https?://.*')))
+        && post.votes is list && post.savedBy is list && post.comments is list;
+    }
+    function ownToggle(previous, next) {
+      return next is list && next.toSet().size() == next.size()
+        && next.toSet().difference(previous.toSet()).hasOnly([me()])
+        && previous.toSet().difference(next.toSet()).hasOnly([me()]);
+    }
+    function newComment(previous, next) {
+      let last = next[next.size() - 1];
+      return next.size() == previous.size() + 1
+        && next.removeAll([last]) == previous
+        && last.keys().hasAll(['id', 'authorId', 'body', 'createdAt'])
+        && last.keys().hasOnly(['id', 'authorId', 'body', 'createdAt'])
+        && text(last.id, 100) && last.id.size() > 0 && last.authorId == me()
+        && text(last.body, 4000) && last.body.size() > 0 && text(last.createdAt, 40);
+    }
+    match /posts/{postId} {
+      allow read: if canRead(resource.data);
+      allow create: if signedIn() && request.resource.data.authorId == me()
+        && validPost(request.resource.data, postId)
+        && request.resource.data.votes.size() == 0
+        && request.resource.data.savedBy.size() == 0
+        && request.resource.data.comments.size() == 0
+        && ((request.resource.data.audienceType == 'self' && request.resource.data.audienceId == me())
+          || (request.resource.data.audienceType == 'user' && exists(/databases/$(database)/documents/users/$(request.resource.data.audienceId)))
+          || (request.resource.data.audienceType == 'group' && member(request.resource.data.audienceId)));
+      allow update: if canRead(resource.data) && validPost(request.resource.data, postId)
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+            && ownToggle(resource.data.votes, request.resource.data.votes))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['savedBy'])
+            && ownToggle(resource.data.savedBy, request.resource.data.savedBy))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
+            && newComment(resource.data.comments, request.resource.data.comments)));
+      allow delete: if signedIn() && resource.data.authorId == me();
+    }
+  }
+}

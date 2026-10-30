@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+test.skip(
+  process.env.RABBIT_E2E_FIREBASE === "1",
+  "Local backend suite; use firebase.spec.ts for live Firebase.",
+);
 const unique = () => `Note ${Date.now()}`;
 test("post to self, find it through search, and keep it after reload", async ({
   page,

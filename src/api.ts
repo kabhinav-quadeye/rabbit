@@ -2,12 +2,15 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import type { Bootstrap, Post } from "./types";
+import { firebaseAuth, firebaseService } from "./firebase";
+export { firebaseEnabled } from "./firebase";
 const nativeHost = Constants.expoConfig?.hostUri?.split(":")[0] ?? "localhost";
 const base =
   process.env.EXPO_PUBLIC_API_URL ??
   (Platform.OS === "web" ? "" : `http://${nativeHost}:3001`);
 let token: string | null = null;
 export async function setToken(next: string | null) {
+  if (firebaseAuth) return;
   token = next;
   if (Platform.OS === "web") {
     if (next) localStorage.setItem("rabbit.session", next);
@@ -18,6 +21,10 @@ export async function setToken(next: string | null) {
   }
 }
 export async function restoreToken() {
+  if (firebaseAuth) {
+    await firebaseAuth.authStateReady();
+    return firebaseAuth.currentUser?.getIdToken() ?? null;
+  }
   token =
     Platform.OS === "web"
       ? localStorage.getItem("rabbit.session")
@@ -29,6 +36,7 @@ export async function request<T = unknown>(
   method = "GET",
   input?: unknown,
 ): Promise<T> {
+  if (firebaseService) return firebaseService.request<T>(path, method, input);
   let response: Response;
   try {
     response = await fetch(`${base}/api${path}`, {

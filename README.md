@@ -8,80 +8,105 @@ Requires Node **22.18+** and npm.
 
 ```sh
 npm install
+cp .env.example .env.local  # already configured in the current checkout
 npm start
 ```
 
-- Expo web: http://localhost:8081
-- API: http://localhost:3001
-- `npm start` runs both processes. Press Ctrl+C to stop them.
-- Use the Expo CLI commands or Expo Go for a native development session. `npm run ios` / `npm run android` start Expo directly; also run `npm run api` in a separate terminal.
+Open http://localhost:8081. With Firebase configured, the app connects directly to Firebase Auth and Cloud Firestore; there is no local API dependency. Firebase maintains the session across reloads, and native password sessions use AsyncStorage.
 
-For a preview of the exported web app, including its API:
+## Connected Firebase project
+
+- Project: **rabbit-quadeye-2026** ([Firebase console](https://console.firebase.google.com/project/rabbit-quadeye-2026/overview)).
+- Firestore: the default database in **asia-south1 (Mumbai)**.
+- Sign-in providers: **email/password** and **Google** are enabled.
+- `.firebaserc` links this repository to the project; `.env.local` supplies the public Firebase web app configuration. `.env.example` contains the same public configuration for a fresh checkout. These are client identifiers, not admin credentials.
+- Authorized Google sign-in domains include `localhost`, `127.0.0.1`, and the project's `firebaseapp.com` / `web.app` domains. Add your domain in Firebase Authentication settings before using Google sign-in there.
+- `firebase.json`, `firestore.rules`, and `firestore.indexes.json` define the providers, access rules, query indexes, and optional static hosting configuration. Hosting has not been deployed.
+
+### Seeded accounts and content
+
+Sign in with **username `alex` and password `alex`**. The equivalent Firebase email is `alex@rabbit.test`.
+
+Alex, Maya, James, Sarah, Omar, and Nina are actual users in Firebase Authentication. The six matching public profiles, three groups, and six original sample posts live in Firestore, including personal notes, direct shares, links, questions, tags, votes, saved items, and comments. Alex belongs to all three sample groups and can explore every existing app feature.
+
+All usernames use the same mapping to `<username>@rabbit.test`; real email addresses also work. There is no special Alex login endpoint, custom token, password substitution, or automatic demo login in Firebase mode. Alex's requested short password is imported as a bcrypt hash using Firebase's user import API. New accounts follow Firebase's minimum of six password characters. The other seeded users receive random passwords.
+
+The sample content is shared test data. New accounts begin with empty feeds and no groups and cannot see Alex's private content.
+
+To seed again, authenticate the globally installed Firebase CLI (`firebase login`) and run:
 
 ```sh
-npm run preview:web
+npm run firebase:seed
 ```
 
-Open http://localhost:4173. This serves the actual Expo export, with a separate persistent preview database at `data/preview.sqlite`.
+Seeding only creates missing users and documents. It preserves existing passwords, profile changes, posts, and interactions. Administrative scripts use the CLI's existing authentication in memory and do not create a service-account key.
 
-## What works
+### Google sign-in
 
-- **Your space:** write a note, link, or question. Choose Just me, another person, or a group. Add tags. Draft text persists per account on the device.
-- **Search:** full text matching across accessible post titles, body text, tags, links, authors, and group names. Filter by groups, personal notes, direct shares, or saved posts.
-- **Recent posts:** newest or most useful first, audience filters, and shortcuts into private groups.
-- **Groups:** create a circle and choose existing users. Any member can add existing users, granting immediate access to that group's existing and future posts.
-- **Conversation:** mark posts useful, save them, and add comments.
-- **Profile:** edit your name and bio, browse your posts and saved items, and sign out.
-- **Accounts:** register and sign in with email/password. Server-side access checks protect feeds, search, votes, saves, and comments.
+On the web, choose **Continue with Google**. Firebase opens Google's OAuth flow and creates the same type of Rabbit profile as password registration. Password sign-in works on web, iOS, and Android. Native Google sign-in is not configured: it requires platform-specific OAuth credentials and a native sign-in integration; use the web app for Google sign-in for now. No Google credentials or provider secrets are bundled in the app.
 
-## Demo and real accounts
+## What works with Firebase
 
-Local development automatically opens **Alex Morgan's clearly labeled Demo space**. All seeded people, groups, and posts are demonstration data. The demo account is intentionally shared across browsers. Do not put private information in it.
+- **Your space:** create a note, link, or question for Just me, another person, or a group. Add tags; device drafts remain per-account.
+- **Search:** match accessible titles, text, tags, links, authors, and groups; filter by groups, personal notes, direct shares, or saved posts.
+- **Recent posts:** newest or most useful first, audience filters, and private group feeds.
+- **Groups:** create a circle and select existing people. Members can add existing users, giving them access to the group's old and new posts.
+- **Conversation:** mark useful, save/unsave, and add comments. Atomic array updates preserve other users' simultaneous changes.
+- **Profile:** edit name and bio, browse your posts and saved items, and sign out.
+- **Accounts:** register with a username or email and password, or use Google on web. Firebase owns credential checking and session refresh.
 
-To create your own account: **Profile → Sign out → Create an account**. New accounts start empty, have their own private notes, and can share with existing users. Passwords are salted and hashed with scrypt. Session tokens are random, stored hashed on the server, persist across restarts, expire after 30 days, and are revoked on sign-out. Native tokens use Expo SecureStore; web tokens use browser localStorage.
+Firestore rules enforce the same privacy model independently of the UI: only authors, direct recipients, and group members can read posts. A person can change only their own useful/save markers and append comments under their own identity. Public profile documents omit email addresses and credentials. Only group members can add members; membership changes cannot remove existing members or change the owner.
 
-To run with demo access and sample seeding disabled, use a fresh database:
+Search operates over the current account's accessible Firestore posts. Screens refresh after actions and when reloading the app; live multi-device subscriptions and server-side full-text indexing are not implemented.
+
+## Checks
+
+```sh
+npm test                      # shared domain and legacy HTTP tests
+npm run test:firebase          # live Firebase auth, persistence, concurrency, access rules
+npm run test:e2e:firebase      # real Alex browser login, seeded views, persistence, Google OAuth entry
+npm run test:e2e               # isolated legacy SQLite browser regression suite
+npm run typecheck
+npm run build:web
+npx expo export --platform ios --platform android --output-dir dist-native
+```
+
+The live Firebase integration test creates temporary accounts and content and cleans them up. Browser tests sign in as Alex without changing the seeded data. Google OAuth testing verifies the popup reaches Google's account flow; completing sign-in requires a person to choose their Google account. Browser tests use installed Google Chrome.
+
+Deploy changed providers, rules, and indexes with:
+
+```sh
+npm run firebase:deploy
+```
+
+To publish the web app later, build it and explicitly deploy Firebase Hosting (`firebase deploy --only hosting`).
+
+## Legacy local backend
+
+The SQLite backend remains available for offline development and regression tests. Set `EXPO_PUBLIC_BACKEND=local` (or remove the Firebase environment variables from `.env.local`) to select it. `npm start` then runs both Expo at port 8081 and the local API at port 3001. It automatically opens the labeled local Demo space unless `DEMO_MODE=0` is set.
 
 ```sh
 DEMO_MODE=0 DB_PATH=data/private.sqlite npm start
 ```
 
-For a single-server web deployment after exporting:
+For an exported local web preview:
 
 ```sh
-npm run build:web
-NODE_ENV=production DB_PATH=data/private.sqlite PORT=3001 npm run serve
+npm run preview:web
 ```
 
-Production mode disables the demo endpoint and sample seeding by default. An existing database is preserved, so use a fresh path to start without earlier demo data. Put the server behind HTTPS and keep its database on persistent storage. No hosted deployment or identity provider is provisioned by this project. Email verification, password reset, account deletion, and moderation are future work.
-
-For a native build talking to a hosted API, set `EXPO_PUBLIC_API_URL` before bundling. On local native development, the app derives the API host from Expo's host URI. Web always uses `/api` on its own origin; Metro proxies that route to the local API during development.
-
-## Checks
-
-```sh
-npm test                # domain, HTTP auth, access control, SQLite restart persistence
-npm run test:e2e        # Playwright; starts isolated API + Expo with a temporary database
-npm run typecheck
-npx expo install --check
-npm run build:web
-npx expo export --platform ios --platform android --output-dir dist-native
-```
-
-Browser tests use installed Google Chrome. If unavailable, install Chrome or change the Playwright channel and install Chromium with `npx playwright install chromium`.
-
-Verified: 18 backend tests and 10 browser flows; desktop and mobile captures at 360, 390, 640, 1024, and 1440px; production web runtime without console errors; successful web/iOS/Android bundle exports. Native simulator/device behavior has not been verified. `node scripts/capture.mjs` captures the running exported preview at port 4173 without changing its content.
-
-`npm audit` currently reports eight transitive advisories in Expo tooling (Zod/deepmerge and their dependents). npm's proposed fix downgrades Expo to SDK 51, so no incompatible downgrade was applied. These are recorded rather than hidden; recheck when upgrading Expo.
+SQLite is used by one local API process; its data is separate from Firebase. Native apps talking to the legacy API can set `EXPO_PUBLIC_API_URL` before bundling. Web uses `/api` on its own origin.
 
 ## Structure
 
 - `App.tsx`, `src/`: responsive React Native screens and shared UI.
-- `components/ui/`: generated gluestack components, including the provider, Button, Input, and Textarea.
-- `server/domain.ts`: authorization and application behavior.
-- `server/api.ts`: Node HTTP API, account/session handling, SQLite persistence, exported web serving.
-- `server/seed.ts`: illustrative local demo content.
-- `tests/`: real domain and HTTP tests plus browser flows.
+- `src/firebase.ts`, `src/firebase-service.ts`, `src/firebase-platform*`: Firebase initialization, persistence, sign-in, and application data operations.
+- `src/identity.ts`: shared username/email normalization.
+- `src/domain.ts`: validation and app behavior shared by Firebase and SQLite; `server/domain.ts` re-exports it.
+- `scripts/firebase-admin.mjs`, `scripts/seed-firebase.mjs`: CLI-authenticated administrative seeding.
+- `server/api.ts`, `server/seed.ts`: optional local API and shared illustrative seed content.
+- `tests/`: domain, HTTP, live Firebase, and browser tests.
+- `components/ui/`: generated gluestack components.
 - `PRODUCT.md`, `DESIGN.md`, `.impeccable/`: product and design records.
 
-SQLite is used by one application server process. Local databases, generated exports, test evidence, and session data are gitignored. The requested Obra test-driven-development and Impeccable skills were installed and applied; they become automatically discoverable on the next Codex turn.
+Local credentials/configuration, databases, generated exports, and test evidence are gitignored. Email verification, password reset, account deletion UI, and moderation remain future work.

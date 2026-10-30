@@ -675,7 +675,7 @@ function Rabbit() {
                 <Brand compact />
               )}
               <View style={[s.row, { gap: desktop ? 20 : 10 }]}>
-                {user.id === "alex" && (
+                {demoEnabled && user.id === "alex" && (
                   <View
                     style={{
                       paddingHorizontal: 8,

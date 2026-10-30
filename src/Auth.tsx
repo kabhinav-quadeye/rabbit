@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Platform } from "react-native";
 import { ArrowRight, LockKeyhole } from "lucide-react-native";
 import { Brand, Action, Field, Privacy } from "./ui";
 import { colors as c, fonts, s } from "./theme";
+import { firebaseEnabled } from "./api";
 export function Auth({
   onAuth,
   onDemo,
@@ -25,6 +26,17 @@ export function Auth({
     setError("");
     try {
       await onAuth(mode, { name, email, password });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function googleSignIn() {
+    setBusy(true);
+    setError("");
+    try {
+      await onAuth("google", {});
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -75,9 +87,15 @@ export function Auth({
             />
           )}
           <Field
-            label="Email address"
-            accessibilityLabel="Email address"
-            placeholder="you@example.com"
+            label={firebaseEnabled ? "Username or email" : "Email address"}
+            accessibilityLabel={
+              firebaseEnabled ? "Username or email" : "Email address"
+            }
+            placeholder={
+              firebaseEnabled
+                ? "your.username or you@example.com"
+                : "you@example.com"
+            }
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
@@ -86,7 +104,13 @@ export function Auth({
           <Field
             label="Password"
             accessibilityLabel="Password"
-            placeholder="At least 8 characters"
+            placeholder={
+              mode === "login"
+                ? "Your password"
+                : firebaseEnabled
+                  ? "At least 6 characters"
+                  : "At least 8 characters"
+            }
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -103,13 +127,25 @@ export function Auth({
             loading={busy}
             disabled={
               !email.trim() ||
-              password.length < 8 ||
+              busy ||
+              password.length <
+                (mode === "login" ? 1 : firebaseEnabled ? 6 : 8) ||
               (mode === "register" && !name.trim())
             }
             icon={ArrowRight}
           >
             {mode === "register" ? "Create your space" : "Sign in"}
           </Action>
+          {firebaseEnabled && Platform.OS === "web" && (
+            <Action
+              secondary
+              onPress={googleSignIn}
+              disabled={busy}
+              label="Continue with Google"
+            >
+              Continue with Google
+            </Action>
+          )}
           <Pressable
             accessibilityRole="button"
             onPress={() => {
