@@ -129,6 +129,16 @@ test(
         }),
         /permission/i,
       );
+      const friendRequest = await request<{ id: string }>(
+        "/friends/requests",
+        "POST",
+        { recipientId: outsiderId },
+      );
+      await services[1].request(
+        `/friends/requests/${friendRequest.id}`,
+        "PATCH",
+        { status: "accepted" },
+      );
       await request(`/groups/${group.id}/members`, "POST", {
         memberIds: [outsiderId],
       });

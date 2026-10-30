@@ -101,6 +101,18 @@ test("registration, login, access checks, search and logout work through HTTP", 
       (await app.call(`/posts/${post.data.id}/save`, "POST", {}, bt)).status,
       403,
     );
+    const friendship = await app.call(
+      "/friends/requests",
+      "POST",
+      { recipientId: bob.data.user.id },
+      at,
+    );
+    await app.call(
+      `/friends/requests/${friendship.data.id}`,
+      "PATCH",
+      { status: "accepted" },
+      bt,
+    );
     const group = await app.call(
       "/groups",
       "POST",
@@ -206,6 +218,135 @@ test("a server with demo disabled starts without sample people or posts", async 
     assert.equal(feed.data.users.length, 1);
     assert.equal(feed.data.groups.length, 0);
     assert.equal(feed.data.posts.length, 0);
+  } finally {
+    await app.stop();
+  }
+});
+
+test("friend discovery, consent and group permissions work through authenticated HTTP and survive restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rabbit-friends-"));
+  const db = join(dir, "friends.sqlite");
+  let app = await start(db);
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    const bob = (await app.call("/auth/register", "POST", account("Bob"))).data;
+    const group = (
+      await app.call("/groups", "POST", { name: "Club" }, alice.token)
+    ).data;
+    assert.equal(
+      (await app.call("/users?q=BO", "GET", undefined, alice.token)).status,
+      200,
+    );
+    const found = await app.call(
+      "/users?q=%40BO",
+      "GET",
+      undefined,
+      alice.token,
+    );
+    assert.deepEqual(
+      found.data.map((u: any) => u.handle),
+      ["bob"],
+    );
+    assert.equal("email" in found.data[0], false);
+    assert.equal((await app.call("/users?q=bob")).status, 401);
+    const invite = () =>
+      app.call(
+        `/groups/${group.id}/members`,
+        "POST",
+        { memberIds: [bob.user.id] },
+        alice.token,
+      );
+    assert.equal((await invite()).status, 403);
+    const sent = await app.call(
+      "/friends/requests",
+      "POST",
+      { recipientId: bob.user.id },
+      alice.token,
+    );
+    assert.equal(sent.status, 201);
+    assert.equal((await invite()).status, 403);
+    assert.equal(
+      (
+        await app.call(
+          `/friends/requests/${sent.data.id}`,
+          "PATCH",
+          { status: "accepted" },
+          alice.token,
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await app.call(
+          `/friends/requests/${sent.data.id}`,
+          "PATCH",
+          { status: "accepted" },
+          bob.token,
+        )
+      ).status,
+      200,
+    );
+    assert.equal((await invite()).status, 200);
+    await app.stop();
+    app = await start(db);
+    const space = (await app.call("/bootstrap", "GET", undefined, bob.token))
+      .data;
+    assert.deepEqual(space.friendIds, [alice.user.id]);
+    assert.equal(space.groups[0].id, group.id);
+  } finally {
+    await app.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("registration normalizes unique usernames and rejects collisions before creating credentials", async () => {
+  const app = await start();
+  try {
+    const first = await app.call("/auth/register", "POST", {
+      ...account("Alice"),
+      email: " Alice@Example.com ",
+    });
+    assert.equal(first.data.user.handle, "alice");
+    assert.equal(
+      (
+        await app.call("/auth/register", "POST", {
+          ...account("Alice"),
+          email: "alice@another.com",
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (
+        await app.call("/auth/register", "POST", {
+          ...account("Alice"),
+          email: "bad+handle@example.com",
+        })
+      ).status,
+      400,
+    );
+    const retry = await app.call("/auth/register", "POST", {
+      ...account("Alice"),
+      email: "other@another.com",
+    });
+    assert.equal(retry.status, 201);
+    const username = await app.call("/auth/register", "POST", {
+      ...account("Reader"),
+      email: "New.Reader",
+    });
+    assert.equal(username.status, 201);
+    assert.equal(username.data.user.handle, "new.reader");
+    assert.equal(
+      (
+        await app.call("/auth/login", "POST", {
+          email: "new.reader",
+          password: account("Reader").password,
+        })
+      ).status,
+      200,
+    );
   } finally {
     await app.stop();
   }

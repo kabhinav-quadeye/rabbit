@@ -1,5 +1,6 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -9,6 +10,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   query,
   where,
   runTransaction,
@@ -21,6 +23,7 @@ import { createService } from "./domain.ts";
 import { loginEmail } from "./identity.ts";
 import type {
   State,
+  FriendRequest,
   User,
   Post,
   Group,
@@ -62,15 +65,25 @@ export function createFirebaseService(
     return auth.currentUser.uid;
   };
   const newId = () => doc(collection(db, "posts")).id;
-  async function ensureProfile() {
+  async function ensureProfile(requestedHandle?: string) {
     const uid = id(),
       account = auth.currentUser!;
     const ref = doc(db, "users", uid);
     await runTransaction(db, async (tx) => {
       const current = await tx.get(ref);
+      const handle = current.exists()
+        ? (current.data() as User).handle
+        : (requestedHandle ??
+          `reader-${uid
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "")
+            .slice(0, 24)}`);
+      const usernameRef = doc(db, "usernames", handle);
+      const username = await tx.get(usernameRef);
+      if (username.exists() && username.data().userId !== uid)
+        throw new Error("This username is taken. Choose another username.");
+      if (!username.exists()) tx.set(usernameRef, { userId: uid });
       if (current.exists()) return;
-      const handle =
-        account.email?.split("@")[0] ?? `reader-${uid.slice(0, 8)}`;
       const user: User = {
         id: uid,
         name: account.displayName || handle,
@@ -85,12 +98,21 @@ export function createFirebaseService(
   async function load(): Promise<Bootstrap> {
     const uid = id();
     await ensureProfile();
-    const [users, groups] = await Promise.all([
+    const [users, groups, sent, received] = await Promise.all([
       getDocs(collection(db, "users")),
       getDocs(
         query(
           collection(db, "groups"),
           where("memberIds", "array-contains", uid),
+        ),
+      ),
+      getDocs(
+        query(collection(db, "friendRequests"), where("senderId", "==", uid)),
+      ),
+      getDocs(
+        query(
+          collection(db, "friendRequests"),
+          where("recipientId", "==", uid),
         ),
       ),
     ]);
@@ -122,6 +144,9 @@ export function createFirebaseService(
       users: users.docs.map((d) => d.data() as User),
       groups: circles,
       posts,
+      friendRequests: [...sent.docs, ...received.docs].map(
+        (d) => d.data() as FriendRequest,
+      ),
     };
     const space = createService(state).bootstrap(uid);
     space.currentUser.email = auth.currentUser!.email ?? undefined;
@@ -156,12 +181,25 @@ export function createFirebaseService(
           throw new Error("Enter a name of 1–60 characters.");
         if (input.password.length < 6)
           throw new Error("Use a password with at least 6 characters.");
+        const handle = email.split("@")[0];
+        if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(handle))
+          throw new Error(
+            "Use a username of 3–40 letters, numbers, dots, underscores or hyphens.",
+          );
+        if ((await getDoc(doc(db, "usernames", handle))).exists())
+          throw new Error("This username is taken. Choose another username.");
         const result = await createUserWithEmailAndPassword(
           auth,
           email,
           input.password,
         );
-        await updateProfile(result.user, { displayName: name });
+        try {
+          await updateProfile(result.user, { displayName: name });
+          await ensureProfile(handle);
+        } catch (error) {
+          await deleteUser(result.user);
+          throw error;
+        }
       } else await signInWithEmailAndPassword(auth, email, input.password);
       await ensureProfile();
       return { token: await auth.currentUser!.getIdToken() };
@@ -171,6 +209,62 @@ export function createFirebaseService(
     const url = new URL(path, "https://rabbit.local");
     const state = await load();
     const service = createService(state, undefined, newId);
+    if (url.pathname === "/users" && method === "GET")
+      return service.findUsers(uid, url.searchParams.get("q") ?? "");
+    if (path === "/friends/requests" && method === "POST") {
+      const recipientId = input.recipientId;
+      // Read both directions so simultaneous opposite requests conflict and retry.
+      const ref = doc(db, "friendRequests", `${uid}:${recipientId}`);
+      const reverse = doc(db, "friendRequests", `${recipientId}:${uid}`);
+      return runTransaction(db, async (tx) => {
+        const snapshots = await Promise.all([tx.get(ref), tx.get(reverse)]);
+        const latest = createService({
+          ...state,
+          friendRequests: snapshots
+            .filter((d) => d.exists())
+            .map((d) => d.data() as FriendRequest),
+        });
+        const request = latest.sendFriendRequest(uid, recipientId);
+        tx.set(ref, request);
+        return request;
+      });
+    }
+    const friendMatch = url.pathname.match(/^\/friends\/requests\/([^/]+)$/);
+    if (friendMatch && method === "PATCH") {
+      const ref = doc(db, "friendRequests", decodeURIComponent(friendMatch[1]));
+      return runTransaction(db, async (tx) => {
+        const snapshot = await tx.get(ref);
+        if (!snapshot.exists()) throw new Error("Friend request not found.");
+        const latest = createService({
+          ...state,
+          friendRequests: [snapshot.data() as FriendRequest],
+        });
+        const request = latest.respondToFriendRequest(
+          uid,
+          snapshot.id,
+          input.status,
+        );
+        if (request.status === "accepted") {
+          const refs = [request.senderId, request.recipientId].map((id) =>
+            doc(db, "friendLists", id),
+          );
+          const lists = await Promise.all(refs.map((ref) => tx.get(ref)));
+          refs.forEach((ref, i) =>
+            tx.set(ref, {
+              ids: [
+                ...new Set([
+                  ...(lists[i].data()?.ids ?? []),
+                  i === 0 ? request.recipientId : request.senderId,
+                ]),
+              ],
+              requestId: request.id,
+            }),
+          );
+        }
+        tx.update(ref, { status: request.status });
+        return request;
+      });
+    }
     if (url.pathname === "/search" && method === "GET")
       return service.search(
         uid,

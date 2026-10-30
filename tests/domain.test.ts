@@ -20,6 +20,15 @@ const fixture = (): State => ({
       icon: "palette",
     },
   ],
+  friendRequests: [
+    {
+      id: "alice:bob",
+      senderId: "alice",
+      recipientId: "bob",
+      status: "accepted",
+    },
+    { id: "bob:eve", senderId: "bob", recipientId: "eve", status: "accepted" },
+  ],
   posts: [
     {
       id: "self",
@@ -165,7 +174,7 @@ test("search matches title, body and tags without leaking private posts", () => 
   );
   assert.deepEqual(app.search("alice", "no result"), []);
 });
-test("group creation includes creator and invited existing users exactly once", () => {
+test("group creation includes creator and invited friends exactly once", () => {
   const app = createService(fixture());
   const g = app.createGroup("alice", {
     name: "  Book club ",
@@ -176,7 +185,7 @@ test("group creation includes creator and invited existing users exactly once", 
   assert.deepEqual(g?.memberIds, ["alice", "bob"]);
   assert.equal(app.bootstrap("bob").groups.length, 2);
 });
-test("any member can add existing users; nonmembers cannot add anyone", () => {
+test("any member can add their friends; nonmembers cannot add anyone", () => {
   const app = createService(fixture());
   assert.throws(() => app.addMembers("eve", "design", ["eve"]), /member/i);
   assert.throws(() => app.addMembers("alice", "design", ["unknown"]), /user/i);

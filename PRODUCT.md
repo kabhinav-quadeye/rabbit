@@ -20,7 +20,7 @@ A private Reddit-like space built around posting useful information and retrievi
 
 ## Capabilities and Constraints
 
-Users can post to themselves, another user, or a group. Members can add existing users to groups they belong to. Users can create groups and invite existing users. Home is an easy post composer with a search toggle. Recent and Profile are the other two primary tabs. Recent provides shortcuts into groups. Search covers accessible information only.
+Users can post to themselves, another user, or a group. Users discover people by unique username and send friend requests from Profile. Accepted requests create mutual friendships. Members can add only their own accepted friends to groups they belong to, including when creating a group. Existing group membership is preserved. Home is an easy post composer with a search toggle. Recent and Profile are the other two primary tabs. Recent provides shortcuts into groups. Search covers accessible information only.
 
 ## Operating Context
 

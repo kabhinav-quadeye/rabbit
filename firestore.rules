@@ -16,7 +16,8 @@ service cloud.firestore {
       return user.keys().hasAll(['id', 'name', 'handle', 'bio', 'color'])
         && user.keys().hasOnly(['id', 'name', 'handle', 'bio', 'color', 'avatar'])
         && user.id == uid && text(user.name, 60) && user.name.size() > 0
-        && text(user.handle, 254) && user.handle.size() > 0
+        && user.handle is string && user.handle.matches('[a-z0-9][a-z0-9._-]{2,39}')
+        && getAfter(/databases/$(database)/documents/usernames/$(user.handle)).data.userId == uid
         && text(user.bio, 240) && user.color in ['sage', 'peach', 'lavender', 'blue', 'sand']
         && (!('avatar' in user) || (text(user.avatar, 2000) && user.avatar.matches('https://.*')));
     }
@@ -26,6 +27,64 @@ service cloud.firestore {
       allow update: if signedIn() && me() == uid && validUser(request.resource.data, uid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'bio', 'avatar', 'color']);
       allow delete: if signedIn() && me() == uid;
+    }
+    match /usernames/{handle} {
+      allow get: if true;
+      allow list: if signedIn();
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['userId'])
+        && request.resource.data.userId == me()
+        && getAfter(/databases/$(database)/documents/users/$(me())).data.handle == handle;
+    }
+    function validRequest(r, requestId) {
+      return r.keys().hasAll(['id', 'senderId', 'recipientId', 'status'])
+        && r.keys().hasOnly(['id', 'senderId', 'recipientId', 'status'])
+        && r.id == requestId && requestId == r.senderId + ':' + r.recipientId
+        && r.senderId != r.recipientId
+        && exists(/databases/$(database)/documents/users/$(r.senderId))
+        && exists(/databases/$(database)/documents/users/$(r.recipientId));
+    }
+    function noReverse(r) {
+      let reverse = /databases/$(database)/documents/friendRequests/$(r.recipientId + ':' + r.senderId);
+      return !exists(reverse) || get(reverse).data.status == 'declined';
+    }
+    function indexed(r) {
+      return r.recipientId in getAfter(/databases/$(database)/documents/friendLists/$(r.senderId)).data.ids
+        && r.senderId in getAfter(/databases/$(database)/documents/friendLists/$(r.recipientId)).data.ids;
+    }
+    match /friendRequests/{requestId} {
+      allow get: if signedIn() && (!exists(/databases/$(database)/documents/friendRequests/$(requestId))
+        || me() in [resource.data.senderId, resource.data.recipientId]);
+      allow list: if signedIn() && (resource.data.senderId == me() || resource.data.recipientId == me());
+      allow create: if signedIn() && validRequest(request.resource.data, requestId)
+        && request.resource.data.senderId == me() && request.resource.data.status == 'pending'
+        && noReverse(request.resource.data);
+      allow update: if signedIn() && validRequest(request.resource.data, requestId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && ((resource.data.status == 'pending' && resource.data.recipientId == me()
+            && (request.resource.data.status == 'declined'
+              || (request.resource.data.status == 'accepted' && indexed(resource.data))))
+          || (resource.data.status == 'declined' && resource.data.senderId == me()
+            && request.resource.data.status == 'pending' && noReverse(resource.data)));
+    }
+    function validFriendList(uid, previous) {
+      let next = request.resource.data;
+      let r = getAfter(/databases/$(database)/documents/friendRequests/$(next.requestId)).data;
+      let other = uid == r.senderId ? r.recipientId : r.senderId;
+      return next.keys().hasAll(['ids', 'requestId']) && next.keys().hasOnly(['ids', 'requestId'])
+        && r.status == 'accepted' && me() == r.recipientId && uid in [r.senderId, r.recipientId]
+        && next.ids is list && next.ids.toSet().size() == next.ids.size()
+        && other in next.ids && next.ids.hasAll(previous)
+        && next.ids.toSet().difference(previous.toSet()).hasOnly([other]);
+    }
+    match /friendLists/{uid} {
+      allow get: if signedIn() && (me() == uid
+        || get(/databases/$(database)/documents/friendRequests/$(uid + ':' + me())).data.status == 'pending');
+      allow create: if signedIn() && validFriendList(uid, []);
+      allow update: if signedIn() && validFriendList(uid, resource.data.ids);
+    }
+    function onlyFriends(ids) {
+      return ids.hasOnly([me()])
+        || ids.difference([me()].toSet()).hasOnly(get(/databases/$(database)/documents/friendLists/$(me())).data.ids);
     }
     function validGroup(group, groupId) {
       return group.keys().hasAll(['id', 'name', 'description', 'ownerId', 'memberIds', 'color', 'icon'])
@@ -41,11 +100,13 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow read: if signedIn() && me() in resource.data.memberIds;
       allow create: if signedIn() && request.resource.data.ownerId == me()
-        && me() in request.resource.data.memberIds && validGroup(request.resource.data, groupId);
+        && me() in request.resource.data.memberIds && validGroup(request.resource.data, groupId)
+        && onlyFriends(request.resource.data.memberIds.toSet());
       allow update: if signedIn() && me() in resource.data.memberIds
         && validGroup(request.resource.data, groupId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
-        && request.resource.data.memberIds.hasAll(resource.data.memberIds);
+        && request.resource.data.memberIds.hasAll(resource.data.memberIds)
+        && onlyFriends(request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()));
       allow delete: if signedIn() && resource.data.ownerId == me();
     }
     function validPost(post, postId) {

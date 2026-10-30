@@ -11,6 +11,7 @@ import {
 import { readFile, stat } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { AppError, createService } from "./domain.ts";
+import { loginEmail } from "../src/identity.ts";
 import { seedState } from "./seed.ts";
 import type { State } from "../src/types.ts";
 
@@ -159,9 +160,12 @@ export function createApi(options: Options = {}) {
               : Date.now() + 60000,
         });
         const input = await body(req);
-        const email = String(input.email ?? "")
-          .trim()
-          .toLowerCase();
+        let email: string;
+        try {
+          email = loginEmail(String(input.email ?? ""));
+        } catch {
+          throw new AppError("Enter a valid username or email address.");
+        }
         const password = input.password;
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
           throw new AppError("Enter a valid email address.");
@@ -182,6 +186,16 @@ export function createApi(options: Options = {}) {
               "An account with this email already exists. Sign in instead.",
               409,
             );
+          const handle = email.split("@")[0];
+          if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(handle))
+            throw new AppError(
+              "Use a username of 3–40 letters, numbers, dots, underscores or hyphens.",
+            );
+          if (state.users.some((u) => u.handle.toLowerCase() === handle))
+            throw new AppError(
+              "This username is taken. Choose another username.",
+              409,
+            );
           const id = randomUUID();
           const salt = randomBytes(16).toString("hex");
           db.prepare("INSERT INTO credentials VALUES(?,?,?,?)").run(
@@ -198,7 +212,7 @@ export function createApi(options: Options = {}) {
                 id,
                 name,
                 email,
-                handle: email.split("@")[0],
+                handle,
                 bio: "",
                 color: "sage",
               },
@@ -249,6 +263,25 @@ export function createApi(options: Options = {}) {
             id,
             url.searchParams.get("q") ?? "",
             url.searchParams.get("scope") ?? "all",
+          ),
+        );
+        return;
+      }
+      if (path === "/api/users" && req.method === "GET") {
+        send(service.findUsers(id, url.searchParams.get("q") ?? ""));
+        return;
+      }
+      if (path === "/api/friends/requests" && req.method === "POST") {
+        send(service.sendFriendRequest(id, (await body(req)).recipientId), 201);
+        return;
+      }
+      const friendMatch = path.match(/^\/api\/friends\/requests\/([^/]+)$/);
+      if (friendMatch && req.method === "PATCH") {
+        send(
+          service.respondToFriendRequest(
+            id,
+            decodeURIComponent(friendMatch[1]),
+            (await body(req)).status,
           ),
         );
         return;
