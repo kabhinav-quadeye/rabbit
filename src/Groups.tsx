@@ -104,11 +104,13 @@ export function GroupForm({
   group,
   onClose,
   onSave,
+  onFindFriends,
 }: {
   data: Bootstrap;
   group?: Group;
   onClose: () => void;
   onSave: (input: any) => Promise<void>;
+  onFindFriends: () => void;
 }) {
   const [name, setName] = useState(""),
     [description, setDescription] = useState(""),
@@ -119,7 +121,7 @@ export function GroupForm({
     [error, setError] = useState("");
   const users = data.users.filter(
     (u) =>
-      u.id !== data.currentUser.id &&
+      data.friendIds.includes(u.id) &&
       !group?.memberIds.includes(u.id) &&
       `${u.name} ${u.handle}`.toLowerCase().includes(query.toLowerCase()),
   );
@@ -146,7 +148,7 @@ export function GroupForm({
       <View style={{ gap: 20 }}>
         <Text style={[s.text, { color: c.muted }]}>
           {group
-            ? `Add existing Rabbit members to ${group.name}. They’ll be able to see all posts in this group.`
+            ? `Add your friends to ${group.name}. They’ll be able to see all posts in this group.`
             : "A private home for a shared interest. Give it a name, then bring your people along."}
         </Text>
         {!group && (
@@ -216,7 +218,7 @@ export function GroupForm({
             <Search size={15} color={c.muted} />
             <TextInput
               accessibilityLabel="Find people to invite"
-              placeholder="Find someone in Rabbit…"
+              placeholder="Search your friends…"
               placeholderTextColor={c.muted}
               value={query}
               onChangeText={setQuery}
@@ -279,11 +281,14 @@ export function GroupForm({
           {!users.length && (
             <Text style={[s.small, { paddingVertical: 10 }]}>
               {query
-                ? "No people match your search."
-                : "Everyone in your Rabbit directory is already here."}
+                ? "No friends match your search."
+                : "No friends to add yet. Find people in Profile and become friends first."}
             </Text>
           )}
         </View>
+        <Action secondary label="Find friends" onPress={onFindFriends}>
+          Find friends in Profile
+        </Action>
         {!!error && (
           <Text accessibilityRole="alert" style={s.error}>
             {error}

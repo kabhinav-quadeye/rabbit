@@ -37,7 +37,22 @@ export type Post = {
   savedBy: string[];
   comments: Comment[];
 };
-export type State = { users: User[]; groups: Group[]; posts: Post[] };
-export type Bootstrap = State & { currentUser: User };
+export type FriendRequest = {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  status: "pending" | "accepted" | "declined";
+};
+export type State = {
+  users: User[];
+  groups: Group[];
+  posts: Post[];
+  friendRequests?: FriendRequest[];
+};
+export type Bootstrap = State & {
+  currentUser: User;
+  friendRequests: FriendRequest[];
+  friendIds: string[];
+};
 export type PostInput = Pick<Post, "audienceType" | "title" | "body"> &
   Partial<Pick<Post, "audienceId" | "type" | "url" | "tags">>;

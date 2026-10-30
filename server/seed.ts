@@ -177,5 +177,14 @@ export function seedState(): State {
       votes: ["james", "nina"],
     },
   ];
-  return { users, groups, posts };
+  // Explicit demonstration friendships; ordinary existing accounts migrate with none.
+  const friendRequests = ["maya", "james", "sarah", "omar"].map(
+    (recipientId) => ({
+      id: `alex:${recipientId}`,
+      senderId: "alex",
+      recipientId,
+      status: "accepted" as const,
+    }),
+  );
+  return { users, groups, posts, friendRequests };
 }

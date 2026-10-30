@@ -87,20 +87,27 @@ export function Auth({
             />
           )}
           <Field
-            label={firebaseEnabled ? "Username or email" : "Email address"}
+            label={mode === "register" ? "Username" : "Username or email"}
             accessibilityLabel={
-              firebaseEnabled ? "Username or email" : "Email address"
+              mode === "register" ? "Username" : "Username or email"
             }
             placeholder={
-              firebaseEnabled
-                ? "your.username or you@example.com"
-                : "you@example.com"
+              mode === "register"
+                ? "your.username"
+                : "your.username or you@example.com"
             }
             autoCapitalize="none"
-            keyboardType="email-address"
+            autoCorrect={false}
+            keyboardType={mode === "register" ? "default" : "email-address"}
             value={email}
             onChangeText={setEmail}
           />
+          {mode === "register" && (
+            <Text style={s.small}>
+              Your unique username helps friends find you. Use 3–40 letters,
+              numbers, dots, underscores or hyphens.
+            </Text>
+          )}
           <Field
             label="Password"
             accessibilityLabel="Password"

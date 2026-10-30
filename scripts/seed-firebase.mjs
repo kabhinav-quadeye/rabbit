@@ -7,7 +7,8 @@ import { seedState } from "../server/seed.ts";
 const project = JSON.parse(
   readFileSync(new URL("../.firebaserc", import.meta.url), "utf8"),
 ).projects.default;
-const state = seedState();
+// Local demo relationships are simulated; live users must accept their own requests.
+const { friendRequests: demoFriendRequests, ...state } = seedState();
 const authBase = `https://identitytoolkit.googleapis.com/v1/projects/${project}`;
 const existing = await adminRequest(`${authBase}/accounts:lookup`, "POST", {
   localId: state.users.map((u) => u.id),

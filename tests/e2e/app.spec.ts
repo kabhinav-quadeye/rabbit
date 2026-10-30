@@ -92,9 +92,7 @@ test("post to self, find it through search, and keep it after reload", async ({
   await page.getByRole("textbox", { name: "Search posts" }).fill(title);
   await expect(page.getByText(title, { exact: true })).toBeVisible();
 });
-test("create a group with an existing user and post to it", async ({
-  page,
-}) => {
+test("create a group with a friend and post to it", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create a group" }).first().click();
   const name = `Reading ${Date.now()}`;
@@ -185,7 +183,7 @@ test("composer renders without runtime errors", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("a group member can invite an existing user", async ({ page }) => {
+test("a group member can invite a friend", async ({ page }) => {
   await page.goto("/");
   await page
     .getByRole("button", { name: "Go to The builders club", exact: true })
@@ -228,9 +226,11 @@ test("a real account can register, sign out and sign in with private data", asyn
   await page
     .getByRole("button", { name: "New here? Create an account" })
     .click();
-  const email = `reader${Date.now()}@example.com`;
+  const email = `reader${Date.now()}`;
   await page.getByRole("textbox", { name: "Your name" }).fill("A New Reader");
-  await page.getByRole("textbox", { name: "Email address" }).fill(email);
+  await page
+    .getByRole("textbox", { name: "Username", exact: true })
+    .fill(email);
   await page.getByLabel("Password", { exact: true }).fill("my-test-password");
   await page
     .getByRole("button", { name: "Create account", exact: true })
@@ -248,7 +248,7 @@ test("a real account can register, sign out and sign in with private data", asyn
   ).toBeVisible();
   await page.getByRole("button", { name: "Profile", exact: true }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await page.getByRole("textbox", { name: "Email address" }).fill(email);
+  await page.getByRole("textbox", { name: "Username or email" }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill("my-test-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("button", { name: "Recent posts", exact: true }).click();
@@ -280,9 +280,9 @@ test("audience choice coordinates the icon, recipient tone and privacy explanati
   await expect(
     page.getByText("Only you and Maya", { exact: true }),
   ).toBeVisible();
-  expect(
-    await person.evaluate((el) => getComputedStyle(el).backgroundColor),
-  ).not.toBe(selfTone);
+  await expect
+    .poll(() => person.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe(selfTone);
   expect(await person.locator("svg").first().innerHTML()).not.toBe(selfIcon);
   await person.click();
   await page.getByRole("button", { name: "Share with Design circle" }).click();

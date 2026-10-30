@@ -1,4 +1,11 @@
-import type { State, User, Group, Post, PostInput } from "./types.ts";
+import type {
+  State,
+  User,
+  Group,
+  Post,
+  PostInput,
+  FriendRequest,
+} from "./types.ts";
 
 export class AppError extends Error {
   status: number;
@@ -23,6 +30,20 @@ export function createService(
   randomUUID: () => string = () => globalThis.crypto.randomUUID(),
 ) {
   const state: State = structuredClone(initial);
+  state.friendRequests ??= [];
+  const requests = state.friendRequests;
+  const friendIds = (id: string) =>
+    requests
+      .filter(
+        (r) =>
+          r.status === "accepted" && [r.senderId, r.recipientId].includes(id),
+      )
+      .map((r) => (r.senderId === id ? r.recipientId : r.senderId));
+  const requireFriends = (id: string, ids: string[]) => {
+    ids.forEach(user);
+    if (ids.some((other) => other !== id && !friendIds(id).includes(other)))
+      fail("You can only add accepted friends to a group.", 403);
+  };
   const user = (id: string): User =>
     state.users.find((u) => u.id === id) ?? fail("User not found.", 404);
   const group = (id: string): Group =>
@@ -65,7 +86,68 @@ export function createService(
         users: state.users.map(publicUser),
         groups: state.groups.filter((g) => g.memberIds.includes(id)),
         posts: visiblePosts(id),
+        friendIds: friendIds(id),
+        friendRequests: requests.filter((r) =>
+          [r.senderId, r.recipientId].includes(id),
+        ),
       });
+    },
+    findUsers(id: string, query: string) {
+      user(id);
+      const handle = query.trim().replace(/^@/, "").toLowerCase();
+      return structuredClone(
+        handle
+          ? state.users
+              .filter(
+                (u) => u.id !== id && u.handle.toLowerCase().startsWith(handle),
+              )
+              .slice(0, 20)
+              .map(publicUser)
+          : [],
+      );
+    },
+    sendFriendRequest(id: string, recipientId: string) {
+      user(id);
+      user(recipientId);
+      if (id === recipientId)
+        fail("You cannot send a friend request to yourself.");
+      const pair = requests.filter(
+        (r) =>
+          [r.senderId, r.recipientId].includes(id) &&
+          [r.senderId, r.recipientId].includes(recipientId),
+      );
+      if (pair.some((r) => r.status === "accepted"))
+        fail("You are already friends.", 409);
+      if (pair.some((r) => r.status === "pending"))
+        fail("A friend request is already pending.", 409);
+      const request: FriendRequest = {
+        id: `${id}:${recipientId}`,
+        senderId: id,
+        recipientId,
+        status: "pending",
+      };
+      const previous = requests.findIndex((r) => r.id === request.id);
+      if (previous >= 0) requests[previous] = request;
+      else requests.push(request);
+      return commit(request);
+    },
+    respondToFriendRequest(
+      id: string,
+      requestId: string,
+      status: "accepted" | "declined",
+    ) {
+      user(id);
+      const request =
+        requests.find((r) => r.id === requestId) ??
+        fail("Friend request not found.", 404);
+      if (request.recipientId !== id)
+        fail("Only the recipient can respond to this request.", 403);
+      if (!["accepted", "declined"].includes(status))
+        fail("Choose a valid response.");
+      if (request.status !== "pending")
+        fail("This request is no longer pending.", 409);
+      request.status = status;
+      return commit(request);
     },
     createPost(id: string, input: PostInput) {
       user(id);
@@ -127,7 +209,7 @@ export function createService(
       if (!Array.isArray(input.memberIds ?? []))
         fail("Members must be a list.");
       const ids = [...new Set([id, ...(input.memberIds ?? [])])];
-      ids.forEach(user);
+      requireFriends(id, ids);
       const g: Group = {
         id: randomUUID(),
         name,
@@ -150,7 +232,10 @@ export function createService(
       if (!g.memberIds.includes(id))
         fail("You must be a member to invite people.", 403);
       if (!Array.isArray(ids) || !ids.length) fail("Choose at least one user.");
-      ids.forEach(user);
+      requireFriends(
+        id,
+        ids.filter((other) => !g.memberIds.includes(other)),
+      );
       g.memberIds = [...new Set([...g.memberIds, ...ids])];
       return commit(g);
     },
