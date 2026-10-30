@@ -254,3 +254,17 @@ test("malformed group member and tag inputs produce validation errors", () => {
     /tag/i,
   );
 });
+test("search supports 'circles' scope alias for groups", () => {
+  const app = createService(fixture());
+  assert.deepEqual(
+    app.search("bob", "#design", "circles").map((p: any) => p.id),
+    ["shared"],
+  );
+});
+test("circle creation validates circle name", () => {
+  const app = createService(fixture());
+  assert.throws(
+    () => app.createGroup("alice", { name: "   " }),
+    /circle name/i,
+  );
+});
