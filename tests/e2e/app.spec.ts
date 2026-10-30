@@ -4,6 +4,72 @@ test.skip(
   "Local backend suite; use firebase.spec.ts for live Firebase.",
 );
 const unique = () => `Note ${Date.now()}`;
+for (const width of [360, 1440]) {
+  test(`sign out is available in the profile at ${width}px and survives reload`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    await expect(
+      page.getByRole("textbox", { name: "Post title" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Sign out", exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Profile", exact: true })
+      .first()
+      .click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Sign in", exact: true }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Sign in", exact: true }),
+    ).toBeVisible();
+  });
+}
+
+test("sign out shows progress and allows retry after a connection error", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "Post title" })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Profile", exact: true })
+    .first()
+    .click();
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    "**/api/auth/logout",
+    async (route) => {
+      await pending;
+      await route.fulfill({
+        status: 503,
+        json: { error: "Couldn’t sign out. Please try again." },
+      });
+    },
+    { times: 1 },
+  );
+  const signOut = page.getByRole("button", { name: "Sign out", exact: true });
+  await signOut.click();
+  await expect(signOut).toBeDisabled();
+  await expect(page.getByText("Signing out…", { exact: true })).toBeVisible();
+  release();
+  await expect(
+    page.getByText("Couldn’t sign out. Please try again."),
+  ).toBeVisible();
+  await expect(signOut).toBeEnabled();
+  await signOut.click();
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+});
+
 test("post to self, find it through search, and keep it after reload", async ({
   page,
 }) => {

@@ -134,6 +134,7 @@ function Rabbit() {
     [bio, setBio] = useState(""),
     [profileError, setProfileError] = useState(""),
     [profileBusy, setProfileBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   async function refresh() {
     const next = await loadSpace();
@@ -263,6 +264,8 @@ function Rabbit() {
     navigate("home");
   }
   async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
     try {
       await request("/auth/logout", "POST", {});
       await setToken(null);
@@ -273,6 +276,8 @@ function Rabbit() {
       navigate("home");
     } catch (e) {
       setToast((e as Error).message);
+    } finally {
+      setSigningOut(false);
     }
   }
   async function saveProfile() {
@@ -634,7 +639,7 @@ function Rabbit() {
                     @{user.handle}
                   </Text>
                 </View>
-                <ChevronDown size={14} color={c.muted} />
+                <ChevronRight size={14} color={c.muted} />
               </Pressable>
             </View>
           )}
@@ -644,7 +649,7 @@ function Rabbit() {
                 s.between,
                 {
                   height: desktop ? 74 : 68,
-                  paddingHorizontal: desktop ? 40 : 20,
+                  paddingHorizontal: desktop ? 40 : 16,
                   borderBottomWidth: 1,
                   borderColor: c.border,
                 },
@@ -672,10 +677,17 @@ function Rabbit() {
                   )}
                 </View>
               ) : (
-                <Brand compact />
+                <View style={{ gap: 1 }}>
+                  <Brand compact />
+                  {demoEnabled && user.id === "alex" && (
+                    <Text style={[s.small, { fontSize: 11, paddingLeft: 39 }]}>
+                      Demo space
+                    </Text>
+                  )}
+                </View>
               )}
-              <View style={[s.row, { gap: desktop ? 20 : 10 }]}>
-                {demoEnabled && user.id === "alex" && (
+              <View style={[s.row, { gap: desktop ? 16 : 4 }]}>
+                {desktop && demoEnabled && user.id === "alex" && (
                   <View
                     style={{
                       paddingHorizontal: 8,
@@ -688,9 +700,9 @@ function Rabbit() {
                     <Text style={[s.small, { fontSize: 10 }]}>Demo space</Text>
                   </View>
                 )}
-                <View style={[s.row, { gap: 5 }]}>
-                  <LockKeyhole size={12} color={c.green} />
-                  {desktop && (
+                {desktop && (
+                  <View style={[s.row, { gap: 5 }]}>
+                    <LockKeyhole size={12} color={c.green} />
                     <Text
                       style={{
                         fontFamily: fonts.medium,
@@ -700,12 +712,21 @@ function Rabbit() {
                     >
                       Your private corner
                     </Text>
-                  )}
-                </View>
+                  </View>
+                )}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Open your profile"
                   onPress={() => navigate("profile")}
+                  style={({ hovered, pressed }: any) => ({
+                    minHeight: 48,
+                    minWidth: 48,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 9,
+                    backgroundColor:
+                      hovered || pressed ? c.greenLight : "transparent",
+                  })}
                 >
                   <Avatar user={user} size={30} />
                 </Pressable>
@@ -1168,9 +1189,18 @@ function Rabbit() {
                           <View
                             style={[s.between, { gap: 12, flexWrap: "wrap" }]}
                           >
-                            <View style={[s.row, { gap: 16 }]}>
+                            <View
+                              style={[
+                                s.row,
+                                {
+                                  gap: 16,
+                                  flex: 1,
+                                  minWidth: desktop ? 0 : "100%",
+                                },
+                              ]}
+                            >
                               <Avatar user={user} size={64} />
-                              <View style={{ gap: 4 }}>
+                              <View style={{ gap: 4, flex: 1, minWidth: 0 }}>
                                 <Text style={[s.h2, { fontSize: 23 }]}>
                                   {user.name}
                                 </Text>
@@ -1181,6 +1211,7 @@ function Rabbit() {
                               <Action
                                 label="Edit profile"
                                 secondary
+                                style={{ minHeight: 48 }}
                                 onPress={() => {
                                   setProfileName(user.name);
                                   setBio(user.bio ?? "");
@@ -1270,12 +1301,13 @@ function Rabbit() {
                             </Text>
                           </View>
                         </View>
-                        <View style={s.between}>
+                        <View style={[s.between, { gap: 8, flexWrap: "wrap" }]}>
                           <View style={[s.row, { gap: 7 }]}>
                             <Chip
                               active={profileMode === "posts"}
                               onPress={() => setProfileMode("posts")}
                               icon={FileText}
+                              style={{ minHeight: 48 }}
                             >
                               Your posts
                             </Chip>
@@ -1283,6 +1315,7 @@ function Rabbit() {
                               active={profileMode === "saved"}
                               onPress={() => setProfileMode("saved")}
                               icon={Bookmark}
+                              style={{ minHeight: 48 }}
                             >
                               Saved
                             </Chip>
@@ -1290,12 +1323,41 @@ function Rabbit() {
                           <Pressable
                             accessibilityRole="button"
                             accessibilityLabel="Sign out"
+                            accessibilityState={{
+                              disabled: signingOut,
+                              busy: signingOut,
+                            }}
+                            disabled={signingOut}
                             onPress={signOut}
-                            style={[s.row, { gap: 6, minHeight: 36 }]}
+                            style={({ hovered, pressed }: any) => [
+                              s.row,
+                              {
+                                gap: 8,
+                                minHeight: 48,
+                                paddingHorizontal: desktop ? 14 : 10,
+                                marginLeft: "auto",
+                                borderWidth: 1,
+                                borderColor: c.border,
+                                borderRadius: 9,
+                                backgroundColor:
+                                  hovered || pressed ? c.greenLight : c.paper,
+                                opacity: signingOut ? 0.65 : 1,
+                              },
+                            ]}
                           >
-                            <LogOut size={13} color={c.muted} />
-                            <Text style={[s.small, { fontSize: 11 }]}>
-                              Sign out
+                            {signingOut ? (
+                              <ActivityIndicator size={16} color={c.muted} />
+                            ) : (
+                              <LogOut
+                                size={16}
+                                color={c.muted}
+                                strokeWidth={1.8}
+                              />
+                            )}
+                            <Text
+                              style={[s.label, { fontFamily: fonts.medium }]}
+                            >
+                              {signingOut ? "Signing out…" : "Sign out"}
                             </Text>
                           </Pressable>
                         </View>
