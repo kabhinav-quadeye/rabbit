@@ -351,3 +351,74 @@ test("registration normalizes unique usernames and rejects collisions before cre
     await app.stop();
   }
 });
+
+test("outdated marks enforce access and persist across a SQLite restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rabbit-outdated-"));
+  const db = join(dir, "posts.sqlite");
+  let app = await start(db);
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    const bob = (await app.call("/auth/register", "POST", account("Bob"))).data;
+    const post = (
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: "Old guide",
+          body: "Check the latest version",
+          audienceType: "user",
+          audienceId: bob.user.id,
+        },
+        alice.token,
+      )
+    ).data;
+    const path = `/posts/${post.id}/outdated`;
+    assert.equal((await app.call(path, "POST", {})).status, 401);
+    const mark = await app.call(
+      path,
+      "POST",
+      { userId: alice.user.id },
+      bob.token,
+    );
+    assert.equal(mark.status, 200);
+    assert.deepEqual(mark.data.outdatedBy, [bob.user.id]);
+    const privatePost = (
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: "Private",
+          body: "Only Alice",
+          audienceType: "self",
+        },
+        alice.token,
+      )
+    ).data;
+    assert.equal(
+      (
+        await app.call(
+          `/posts/${privatePost.id}/outdated`,
+          "POST",
+          {},
+          bob.token,
+        )
+      ).status,
+      403,
+    );
+    await app.stop();
+    app = await start(db);
+    const feed = (await app.call("/bootstrap", "GET", undefined, alice.token))
+      .data;
+    assert.deepEqual(feed.posts.find((p: any) => p.id === post.id).outdatedBy, [
+      bob.user.id,
+    ]);
+    assert.deepEqual(
+      (await app.call(path, "POST", {}, bob.token)).data.outdatedBy,
+      [],
+    );
+  } finally {
+    await app.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

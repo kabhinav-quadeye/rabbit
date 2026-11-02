@@ -254,3 +254,38 @@ test("malformed group member and tag inputs produce validation errors", () => {
     /tag/i,
   );
 });
+
+test("outdated marks on legacy posts persist per reader and undo only their own mark", () => {
+  let state = fixture();
+  let writes = 0;
+  const app = createService(state, (saved) => {
+    state = saved;
+    writes++;
+  });
+  assert.deepEqual(app.toggleOutdated("bob", "shared").outdatedBy, ["bob"]);
+  app.toggleOutdated("alice", "shared");
+  assert.deepEqual(app.toggleOutdated("bob", "shared").outdatedBy, ["alice"]);
+  const reloaded = createService(JSON.parse(JSON.stringify(state)));
+  assert.deepEqual(reloaded.search("bob", "contrast")[0].outdatedBy, ["alice"]);
+  assert.equal(writes, 3);
+  assert.deepEqual(reloaded.toggleOutdated("alice", "shared").outdatedBy, []);
+});
+
+test("outdated marks require post access and cannot forge another reader's mark at creation", () => {
+  const app = createService(fixture());
+  for (const [user, post] of [
+    ["eve", "shared"],
+    ["bob", "self"],
+    ["alice", "secret"],
+    ["alice", "missing"],
+  ]) {
+    assert.throws(() => app.toggleOutdated(user, post), /access/i);
+  }
+  const post = app.createPost("alice", {
+    audienceType: "self",
+    title: "Fresh note",
+    body: "Current information",
+    outdatedBy: ["bob"],
+  } as any);
+  assert.deepEqual(post.outdatedBy, []);
+});

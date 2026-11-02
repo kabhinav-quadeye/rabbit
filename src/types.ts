@@ -35,6 +35,7 @@ export type Post = {
   createdAt: string;
   votes: string[];
   savedBy: string[];
+  outdatedBy?: string[];
   comments: Comment[];
 };
 export type FriendRequest = {

@@ -18,7 +18,13 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { createFirebaseService } from "../src/firebase-service.ts";
-import type { Bootstrap, FriendRequest, Group, User } from "../src/types.ts";
+import type {
+  Bootstrap,
+  FriendRequest,
+  Group,
+  Post,
+  User,
+} from "../src/types.ts";
 
 test(
   "Firebase friendship consent and group rules cannot be bypassed by direct writes",
@@ -132,6 +138,73 @@ test(
         }),
         /permission/i,
       );
+      // Legacy documents have no outdatedBy field; no migration is required.
+      const post: Post = {
+        id: `legacy-${suffix}`,
+        authorId: a,
+        audienceType: "group",
+        audienceId: group.id,
+        title: "Old guide",
+        body: "Check the current version",
+        tags: [],
+        type: "note",
+        createdAt: new Date().toISOString(),
+        votes: [],
+        savedBy: [],
+        comments: [],
+      };
+      const postRef = (i: number) => doc(databases[i], "posts", post.id);
+      await setDoc(postRef(0), post);
+      await assert.rejects(
+        updateDoc(postRef(2), { outdatedBy: [e] }),
+        /permission/i,
+      );
+      await assert.rejects(
+        updateDoc(postRef(1), { outdatedBy: [a] }),
+        /permission/i,
+      );
+      await assert.rejects(
+        updateDoc(postRef(1), { outdatedBy: "outdated" }),
+        /permission/i,
+      );
+      await assert.rejects(
+        setDoc(doc(databases[0], "posts", `forged-${suffix}`), {
+          ...post,
+          id: `forged-${suffix}`,
+          outdatedBy: [b],
+        }),
+        /permission/i,
+      );
+      await updateDoc(postRef(1), { outdatedBy: [b] });
+      assert.deepEqual((await getDoc(postRef(0))).data()!.outdatedBy, [b]);
+      await assert.rejects(
+        updateDoc(postRef(0), { outdatedBy: [] }),
+        /permission/i,
+      );
+      await assert.rejects(
+        updateDoc(postRef(0), { outdatedBy: [b, a, a] }),
+        /permission/i,
+      );
+      await assert.rejects(
+        updateDoc(postRef(0), { outdatedBy: [b, a], body: "Changed" }),
+        /permission/i,
+      );
+      await alice(`/posts/${post.id}/outdated`, "POST");
+      assert.deepEqual(
+        new Set((await getDoc(postRef(0))).data()!.outdatedBy),
+        new Set([a, b]),
+      );
+      await bob(`/posts/${post.id}/outdated`, "POST");
+      assert.deepEqual((await getDoc(postRef(0))).data()!.outdatedBy, [a]);
+      await alice(`/posts/${post.id}/outdated`, "POST");
+      assert.deepEqual((await getDoc(postRef(0))).data()!.outdatedBy, []);
+      const fresh = await alice<Post>("/posts", "POST", {
+        audienceType: "self",
+        title: "Fresh",
+        body: "Current",
+        outdatedBy: [b],
+      });
+      assert.deepEqual(fresh.outdatedBy, []);
       const forged = writeBatch(databases[2]);
       forged.set(doc(databases[2], "friendRequests", `${e}:${a}`), {
         id: `${e}:${a}`,
