@@ -112,11 +112,11 @@ for (const width of [390, 1440]) {
       .getByRole("button", { name: "Recent posts", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Create a group", exact: true })
+      .getByRole("button", { name: "Create a circle", exact: true })
       .first()
       .click();
     await page
-      .getByRole("textbox", { name: "Group name" })
+      .getByRole("textbox", { name: "Circle name" })
       .fill(`Friends ${suffix}`);
     await expect(
       page.getByRole("button", { name: "Select Maya Patel" }),
@@ -126,7 +126,7 @@ for (const width of [390, 1440]) {
       .click();
     await capture("friends-group");
     await page
-      .getByRole("button", { name: "Create group", exact: true })
+      .getByRole("button", { name: "Create circle", exact: true })
       .click();
     await expect(
       page.getByText("2 members", { exact: true }).first(),

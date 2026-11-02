@@ -521,11 +521,11 @@ function Rabbit() {
                     letterSpacing: 1.3,
                   }}
                 >
-                  YOUR GROUPS
+                  YOUR CIRCLES
                 </Text>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Create a group"
+                  accessibilityLabel="Create a circle"
                   onPress={() => setGroupForm(true)}
                   style={{ padding: 5 }}
                 >
@@ -570,7 +570,7 @@ function Rabbit() {
               ))}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Create a group"
+                accessibilityLabel="Create a circle"
                 onPress={() => setGroupForm(true)}
                 style={[
                   s.row,
@@ -583,7 +583,7 @@ function Rabbit() {
                 ]}
               >
                 <Plus size={14} color={c.muted} />
-                <Text style={[s.small, { fontSize: 12 }]}>Create a group</Text>
+                <Text style={[s.small, { fontSize: 12 }]}>Create a circle</Text>
               </Pressable>
               <View style={{ flex: 1, minHeight: 30 }} />
               <View
@@ -661,7 +661,7 @@ function Rabbit() {
                   <Grid2X2 size={15} color={c.muted} />
                   <Text style={[s.small, { fontSize: 12 }]}>
                     {selectedGroup
-                      ? "Your groups"
+                      ? "Your circles"
                       : tab === "home"
                         ? "Your space"
                         : tab === "recent"
@@ -938,7 +938,7 @@ function Rabbit() {
                               >
                                 {[
                                   { id: "all", label: "Everything" },
-                                  { id: "groups", label: "Groups" },
+                                  { id: "groups", label: "Circles" },
                                   { id: "personal", label: "Just me" },
                                   { id: "people", label: "Direct shares" },
                                   { id: "saved", label: "Saved" },
@@ -1027,7 +1027,7 @@ function Rabbit() {
                                 <View style={s.card}>
                                   <Empty
                                     title="A good place to begin."
-                                    body="Save your first thought above, or invite a few people into a new group."
+                                    body="Save your first thought above, or invite a few people into a new circle."
                                   />
                                 </View>
                               )}
@@ -1071,7 +1071,7 @@ function Rabbit() {
                               </View>
                               <Pressable
                                 accessibilityRole="button"
-                                accessibilityLabel="Invite people to group"
+                                accessibilityLabel="Invite people to circle"
                                 onPress={() => setGroupForm(group)}
                                 style={[s.row, { gap: 5, minHeight: 36 }]}
                               >
@@ -1088,7 +1088,7 @@ function Rabbit() {
                               </Pressable>
                             </View>
                             <Action
-                              label="Post to this group"
+                              label="Post to this circle"
                               icon={SquarePen}
                               onPress={() => {
                                 setDestination(`group:${group.id}`);
@@ -1122,7 +1122,7 @@ function Rabbit() {
                           >
                             {[
                               { id: "all", label: "All posts" },
-                              { id: "groups", label: "Groups" },
+                              { id: "groups", label: "Circles" },
                               { id: "self", label: "Just me" },
                               { id: "direct", label: "Shared with me" },
                             ]
@@ -1501,7 +1501,7 @@ function Rabbit() {
                         </Text>
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel="Create a group"
+                          accessibilityLabel="Create a circle"
                           onPress={() => setGroupForm(true)}
                           style={[s.row, { gap: 6, minHeight: 32 }]}
                         >
@@ -1653,7 +1653,7 @@ function MobileCircles({
         <Text style={[s.label, { fontSize: 13 }]}>Your circles</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Create a group"
+          accessibilityLabel="Create a circle"
           onPress={onCreate}
           style={[s.row, { gap: 4, minHeight: 30 }]}
         >
@@ -1672,7 +1672,7 @@ function MobileCircles({
           <Pressable
             key={g.id}
             accessibilityRole="button"
-            accessibilityLabel={`Open group ${g.name}`}
+            accessibilityLabel={`Open circle ${g.name}`}
             onPress={() => onGroup(g.id)}
             style={[
               s.row,

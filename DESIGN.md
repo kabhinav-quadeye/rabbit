@@ -165,8 +165,8 @@ A muted garden palette supports a paper-like interface and identifiable small ci
 
 ### Secondary
 
-- **Sage**, **clay peach**, **soft lavender**, **sky blue** and **oat sand**: paired background/ink tokens identify groups and people. Preserve the pair wherever that identity appears.
-- **Sage** also marks the composer's self audience; it does not imply group membership.
+- **Sage**, **clay peach**, **soft lavender**, **sky blue** and **oat sand**: paired background/ink tokens identify circles and people. Preserve the pair wherever that identity appears.
+- **Sage** also marks the composer's self audience; it does not imply circle membership.
 
 ### Neutral
 
@@ -212,7 +212,7 @@ The adaptive shell uses a persistent left rail (228px) at viewport widths of (96
 
 At (1230px) and above, a support column (278px) sits beside the flexible main column with a (28px) gap. The inner page is centered with a maximum width of (1190px). The reading column uses `minWidth: 0` so long content can wrap. Desktop outer horizontal padding is (40px), phone content padding is (18px); the header uses (20px) on phones. Page top padding is (34px) desktop and (26px) phone. Panel stacks commonly use (24px) gaps.
 
-Composer padding is (24px) horizontally and (22px) at the top; its footer uses (22px) horizontally and (14px) vertically. Post cards use the card spacing token. Identity, metadata and action rows typically use gaps between (6px) and (12px), wrapping when needed. Mobile group shortcuts scroll horizontally within their own strip.
+Composer padding is (24px) horizontally and (22px) at the top; its footer uses (22px) horizontally and (14px) vertically. Post cards use the card spacing token. Identity, metadata and action rows typically use gaps between (6px) and (12px), wrapping when needed. Mobile circle shortcuts scroll horizontally within their own strip.
 
 Dialogs center within a viewport scrim, use standard/wide maximum widths of (520px)/(740px), and cap height at viewport height minus (48px). Outer dialog padding changes from (12px) below (600px) to (32px) above it.
 
@@ -226,7 +226,7 @@ Web button state transitions last (180ms), ease out, and affect background, bord
 
 ## Shapes
 
-Forms are gently rounded rectangles. Cards have the card radius, controls the control radius, and compact chips the chip radius. Modal surfaces are slightly softer. Borders are normally a single pixel in paper edge. Avatars are true circles; group marks are rounded squares using the group-icon radius. Use stroked Lucide vector icons with mostly (1.7–1.8px) strokes; group marks scale their glyph to (46%) of the container. Keep icons subordinate to text and never substitute text glyphs for the vector assets.
+Forms are gently rounded rectangles. Cards have the card radius, controls the control radius, and compact chips the chip radius. Modal surfaces are slightly softer. Borders are normally a single pixel in paper edge. Avatars are true circles; circle marks are rounded squares using the group-icon radius. Use stroked Lucide vector icons with mostly (1.7–1.8px) strokes; circle marks scale their glyph to (46%) of the container. Keep icons subordinate to text and never substitute text glyphs for the vector assets.
 
 ## Components
 
@@ -256,7 +256,7 @@ The Home compose/search switch has a softly tinted, outlined compact-panel conta
 
 ### Audience signature
 
-The composer's audience button is a (36px) minimum-height chip with a (240px) maximum width. Self pairs a lock with sage and “Only you can see this.” A person pairs `UserRound` with that person's avatar tone and “Only you and [first name].” A group pairs its actual palette/blocks/book/users glyph with its group tone and “Visible to [count] group members.” The footer keeps a quiet lock beside the explanation. The recipient picker repeats actual avatar/group identities and marks the selected row with pale foliage and a check.
+The composer's audience button is a (36px) minimum-height chip with a (240px) maximum width. Self pairs a lock with sage and “Only you can see this.” A person pairs `UserRound` with that person's avatar tone and “Only you and [first name].” A circle pairs its actual palette/blocks/book/users glyph with its circle tone and “Visible to [count] circle members.” The footer keeps a quiet lock beside the explanation. The recipient picker repeats actual avatar/circle identities and marks the selected row with pale foliage and a check.
 
 This three-part signature is specific to the composer. Existing post metadata badges use a smaller lock badge and are not claimed to implement the same glyph-switching behavior.
 
@@ -270,7 +270,7 @@ This three-part signature is specific to the composer. Existing post metadata ba
 - Do adapt the rail and support column to the observed breakpoints while preserving the three primary destinations.
 
 ### Don't:
-- Don't use group colors to replace the primary action color.
+- Don't use circle colors to replace the primary action color.
 - Don't add decorative shadows to reading cards.
 - Don't use the faint color for composer placeholders; use muted.
 - Don't treat the available dark token declarations as a shipped dark appearance.
