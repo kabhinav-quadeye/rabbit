@@ -42,12 +42,12 @@ export function createService(
   const requireFriends = (id: string, ids: string[]) => {
     ids.forEach(user);
     if (ids.some((other) => other !== id && !friendIds(id).includes(other)))
-      fail("You can only add accepted friends to a group.", 403);
+      fail("You can only add accepted friends to a circle.", 403);
   };
   const user = (id: string): User =>
     state.users.find((u) => u.id === id) ?? fail("User not found.", 404);
   const group = (id: string): Group =>
-    state.groups.find((g) => g.id === id) ?? fail("Group not found.", 404);
+    state.groups.find((g) => g.id === id) ?? fail("Circle not found.", 404);
   const isMember = (id: string, groupId: string) =>
     state.groups.some((g) => g.id === groupId && g.memberIds.includes(id));
   const canRead = (id: string, p: Post) =>
@@ -158,7 +158,7 @@ export function createService(
           ? id
           : text(input.audienceId, "Audience", 100);
       if (input.audienceType === "group" && !isMember(id, audienceId))
-        fail("You must be a member to post to this group.", 403);
+        fail("You must be a member to post to this circle.", 403);
       if (input.audienceType === "user") user(audienceId);
       const title = text(input.title, "Title", 180);
       const body = text(input.body ?? "", "Post", 20000, false);
@@ -205,7 +205,7 @@ export function createService(
     },
     createGroup(id: string, input: Partial<Group>) {
       user(id);
-      const name = text(input.name, "Group name", 60);
+      const name = text(input.name, "Circle name", 60);
       if (!Array.isArray(input.memberIds ?? []))
         fail("Members must be a list.");
       const ids = [...new Set([id, ...(input.memberIds ?? [])])];
@@ -248,7 +248,7 @@ export function createService(
         .filter(Boolean);
       return structuredClone(
         visiblePosts(id).filter((p) => {
-          if (scope === "groups" && p.audienceType !== "group") return false;
+          if ((scope === "groups" || scope === "circles") && p.audienceType !== "group") return false;
           if (
             scope === "personal" &&
             !(p.audienceType === "self" && p.authorId === id)

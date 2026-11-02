@@ -99,7 +99,7 @@ export function Composer({
     kind === "group" ? GroupGlyph : kind === "user" ? UserRound : LockKeyhole;
   const privacy =
     kind === "group"
-      ? `Visible to ${group?.memberIds.length ?? 0} group members`
+      ? `Visible to ${group?.memberIds.length ?? 0} circle members`
       : kind === "user"
         ? `Only you and ${person?.name.split(" ")[0]}`
         : "Only you can see this";
@@ -397,7 +397,7 @@ export function Composer({
             }}
           />
           <Text style={[s.label, { marginTop: 20, marginBottom: 8 }]}>
-            Your groups
+            Your circles
           </Text>
           {data.groups.map((g) => (
             <AudienceRow

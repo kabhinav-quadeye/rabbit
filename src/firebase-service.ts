@@ -291,7 +291,7 @@ export function createFirebaseService(
       const ref = doc(db, "groups", groupMatch[1]);
       return runTransaction(db, async (tx) => {
         const snapshot = await tx.get(ref);
-        if (!snapshot.exists()) throw new Error("Group not found.");
+        if (!snapshot.exists()) throw new Error("Circle not found.");
         const latest = createService({
           ...state,
           groups: [snapshot.data() as Group],

@@ -27,11 +27,11 @@ Open http://localhost:8081. With Firebase configured, the app connects directly 
 
 Sign in with **username `alex` and password `alex`**. The equivalent Firebase email is `alex@rabbit.test`.
 
-Alex, Maya, James, Sarah, Omar, and Nina are actual users in Firebase Authentication. The six matching public profiles, three groups, and six original sample posts live in Firestore, including personal notes, direct shares, links, questions, tags, votes, saved items, and comments. Alex belongs to all three sample groups and can explore every existing app feature.
+Alex, Maya, James, Sarah, Omar, and Nina are actual users in Firebase Authentication. The six matching public profiles, three circles, and six original sample posts live in Firestore, including personal notes, direct shares, links, questions, tags, votes, saved items, and comments. Alex belongs to all three sample circles and can explore every existing app feature.
 
 All usernames use the same mapping to `<username>@rabbit.test`; real email addresses also work. There is no special Alex login endpoint, custom token, password substitution, or automatic demo login in Firebase mode. Alex's requested short password is imported as a bcrypt hash using Firebase's user import API. New accounts follow Firebase's minimum of six password characters. The other seeded users receive random passwords.
 
-The sample content is shared test data. New accounts begin with empty feeds and no groups and cannot see Alex's private content.
+The sample content is shared test data. New accounts begin with empty feeds and no circles and cannot see Alex's private content.
 
 To seed again, authenticate the globally installed Firebase CLI (`firebase login`) and run:
 
@@ -47,15 +47,16 @@ On the web, choose **Continue with Google**. Firebase opens Google's OAuth flow 
 
 ## What works with Firebase
 
-- **Your space:** create a note, link, or question for Just me, another person, or a group. Add tags; device drafts remain per-account.
-- **Search:** match accessible titles, text, tags, links, authors, and groups; filter by groups, personal notes, direct shares, or saved posts.
-- **Recent posts:** newest or most useful first, audience filters, and private group feeds.
-- **Groups:** create a circle and select existing people. Members can add existing users, giving them access to the group's old and new posts.
+- **Your space:** create a note, link, or question for Just me, another person, or a circle. Add tags; device drafts remain per-account.
+- **Search:** match accessible titles, text, tags, links, authors, and circles; filter by circles, personal notes, direct shares, or saved posts.
+- **Recent posts:** newest or most useful first, audience filters, and private circle feeds.
+- **Circles:** create a circle and select existing people. Members can add existing users, giving them access to the circle's old and new posts.
+  Circles are called `group` in code, API routes and Firestore (`groups` collection, `audienceType: "group"`); only user-facing wording says circle.
 - **Conversation:** mark useful, save/unsave, and add comments. Atomic array updates preserve other users' simultaneous changes.
 - **Profile:** edit name and bio, browse your posts and saved items, and sign out.
 - **Accounts:** register with a username or email and password, or use Google on web. Firebase owns credential checking and session refresh.
 
-Firestore rules enforce the same privacy model independently of the UI: only authors, direct recipients, and group members can read posts. A person can change only their own useful/save markers and append comments under their own identity. Public profile documents omit email addresses and credentials. Only group members can add members; membership changes cannot remove existing members or change the owner.
+Firestore rules enforce the same privacy model independently of the UI: only authors, direct recipients, and circle members can read posts. A person can change only their own useful/save markers and append comments under their own identity. Public profile documents omit email addresses and credentials. Only circle members can add members; membership changes cannot remove existing members or change the owner.
 
 Search operates over the current account's accessible Firestore posts. Screens refresh after actions and when reloading the app; live multi-device subscriptions and server-side full-text indexing are not implemented.
 

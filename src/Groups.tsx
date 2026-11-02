@@ -35,7 +35,7 @@ export function Circles({
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Create a group"
+          accessibilityLabel="Create a circle"
           onPress={onCreate}
           style={{ padding: 5 }}
         >
@@ -46,7 +46,7 @@ export function Circles({
         <Pressable
           key={g.id}
           accessibilityRole="button"
-          accessibilityLabel={`Open group ${g.name}`}
+          accessibilityLabel={`Open circle ${g.name}`}
           onPress={() => onGroup(g.id)}
           style={({ hovered }: any) => [
             s.row,
@@ -63,7 +63,7 @@ export function Circles({
               {g.name}
             </Text>
             <Text style={[s.small, { fontSize: 10 }]}>
-              {g.memberIds.length} members · Private group
+              {g.memberIds.length} members · Private circle
             </Text>
           </View>
           <ArrowUpRight size={13} color={c.faint} />
@@ -71,12 +71,12 @@ export function Circles({
       ))}
       {!data.groups.length && (
         <Text style={s.small}>
-          Your circles start with an invitation. Create your first group below.
+          Your circles start with an invitation. Create your first circle below.
         </Text>
       )}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create a group"
+        accessibilityLabel="Create a circle"
         onPress={onCreate}
         style={[
           s.row,
@@ -93,7 +93,7 @@ export function Circles({
         <Text
           style={{ fontFamily: fonts.medium, fontSize: 12, color: c.green }}
         >
-          Create a group
+          Create a circle
         </Text>
       </Pressable>
     </View>
@@ -148,22 +148,22 @@ export function GroupForm({
       <View style={{ gap: 20 }}>
         <Text style={[s.text, { color: c.muted }]}>
           {group
-            ? `Add your friends to ${group.name}. They’ll be able to see all posts in this group.`
+            ? `Add your friends to ${group.name}. They’ll be able to see all posts in this circle.`
             : "A private home for a shared interest. Give it a name, then bring your people along."}
         </Text>
         {!group && (
           <>
             <Field
-              label="Group name"
-              accessibilityLabel="Group name"
+              label="Circle name"
+              accessibilityLabel="Circle name"
               placeholder="e.g. The Sunday reading club"
               value={name}
               onChangeText={setName}
               maxLength={60}
             />
             <Field
-              label="What’s this group about?"
-              accessibilityLabel="Group description"
+              label="What’s this circle about?"
+              accessibilityLabel="Circle description"
               placeholder="A little context for your circle (optional)"
               value={description}
               onChangeText={setDescription}
@@ -300,13 +300,13 @@ export function GroupForm({
             <Text style={[s.small, { fontSize: 11 }]}>Always private</Text>
           </View>
           <Action
-            label={group ? "Add members" : "Create group"}
+            label={group ? "Add members" : "Create circle"}
             onPress={save}
             loading={busy}
             disabled={group ? !selected.length : !name.trim()}
             icon={Plus}
           >
-            {group ? "Add to group" : "Create group"}
+            {group ? "Add to circle" : "Create circle"}
           </Action>
         </View>
       </View>

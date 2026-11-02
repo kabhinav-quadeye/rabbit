@@ -92,15 +92,15 @@ test("post to self, find it through search, and keep it after reload", async ({
   await page.getByRole("textbox", { name: "Search posts" }).fill(title);
   await expect(page.getByText(title, { exact: true })).toBeVisible();
 });
-test("create a group with a friend and post to it", async ({ page }) => {
+test("create a circle with a friend and post to it", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create a group" }).first().click();
+  await page.getByRole("button", { name: "Create a circle" }).first().click();
   const name = `Reading ${Date.now()}`;
-  await page.getByRole("textbox", { name: "Group name" }).fill(name);
+  await page.getByRole("textbox", { name: "Circle name" }).fill(name);
   await page.getByRole("button", { name: "Select Maya Patel" }).click();
-  await page.getByRole("button", { name: "Create group", exact: true }).click();
+  await page.getByRole("button", { name: "Create circle", exact: true }).click();
   await expect(page.getByText(name).first()).toBeVisible();
-  await page.getByRole("button", { name: "Post to this group" }).click();
+  await page.getByRole("button", { name: "Post to this circle" }).click();
   await page.getByRole("textbox", { name: "Post title" }).fill(`For ${name}`);
   await page
     .getByRole("textbox", { name: "Post content" })
@@ -183,12 +183,12 @@ test("composer renders without runtime errors", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("a group member can invite a friend", async ({ page }) => {
+test("a circle member can invite a friend", async ({ page }) => {
   await page.goto("/");
   await page
     .getByRole("button", { name: "Go to The builders club", exact: true })
     .click();
-  await page.getByRole("button", { name: "Invite people to group" }).click();
+  await page.getByRole("button", { name: "Invite people to circle" }).click();
   await page.getByRole("button", { name: "Select Omar Hassan" }).click();
   await page.getByRole("button", { name: "Add members", exact: true }).click();
   await expect(page.getByText("4 members", { exact: true })).toBeVisible();
@@ -286,13 +286,13 @@ test("audience choice coordinates the icon, recipient tone and privacy explanati
   expect(await person.locator("svg").first().innerHTML()).not.toBe(selfIcon);
   await person.click();
   await page.getByRole("button", { name: "Share with Design circle" }).click();
-  const group = page.getByRole("button", {
+  const circle = page.getByRole("button", {
     name: "Choose audience, Design circle",
   });
   await expect(
-    page.getByText("Visible to 4 group members", { exact: true }),
+    page.getByText("Visible to 4 circle members", { exact: true }),
   ).toBeVisible();
-  expect(await group.locator("svg").first().innerHTML()).not.toBe(selfIcon);
+  expect(await circle.locator("svg").first().innerHTML()).not.toBe(selfIcon);
 });
 
 test("composer placeholders meet readable text contrast on their white surface", async ({
