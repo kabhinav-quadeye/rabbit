@@ -268,3 +268,28 @@ test("circle creation validates circle name", () => {
     /circle name/i,
   );
 });
+test("user-facing errors call groups circles", () => {
+  const app = createService(fixture());
+  assert.throws(
+    () =>
+      app.createPost("eve", {
+        audienceType: "group",
+        audienceId: "design",
+        title: "Attack",
+        body: "Secret",
+      }),
+    /post to this circle/i,
+  );
+  assert.throws(
+    () => app.addMembers("alice", "missing", ["bob"]),
+    /circle not found/i,
+  );
+  assert.throws(
+    () => app.createGroup("alice", { name: " " }),
+    /circle name/i,
+  );
+  assert.throws(
+    () => app.createGroup("alice", { name: "Club", memberIds: ["eve"] }),
+    /friends to a circle/i,
+  );
+});

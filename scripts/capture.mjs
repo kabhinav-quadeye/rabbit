@@ -106,10 +106,10 @@ await capture(page, "mobile-empty-search");
 await page.getByRole("button", { name: "Recent posts", exact: true }).click();
 await capture(page, "mobile-recent");
 await page
-  .getByRole("button", { name: "Open group Design circle", exact: true })
+  .getByRole("button", { name: "Open circle Design circle", exact: true })
   .click();
 await capture(page, "mobile-group");
-await page.getByRole("button", { name: "Invite people to group" }).click();
+await page.getByRole("button", { name: "Invite people to circle" }).click();
 await page.getByRole("dialog", { name: "Invite your people" }).waitFor();
 await page.getByRole("button", { name: "Select Omar Hassan" }).click();
 await capture(page, "mobile-invite");
