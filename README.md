@@ -1,4 +1,4 @@
-# Rabbit
+# Rabbit App
 
 A private space for friends and small communities to share useful information. Built with **Expo SDK 58**, **React Native 0.88**, **React 19.3**, and **gluestack UI 5 + UniWind**. The same app exports to web, iOS, and Android.
 
