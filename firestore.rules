@@ -111,12 +111,13 @@ service cloud.firestore {
     }
     function validPost(post, postId) {
       return post.keys().hasAll(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'createdAt', 'votes', 'savedBy', 'comments'])
-        && post.keys().hasOnly(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'url', 'createdAt', 'votes', 'savedBy', 'comments'])
+        && post.keys().hasOnly(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'url', 'createdAt', 'votes', 'savedBy', 'comments', 'outdatedBy'])
         && post.id == postId && text(post.title, 180) && post.title.size() > 0
         && text(post.body, 20000) && post.tags is list && post.tags.size() <= 6
         && post.type in ['note', 'link', 'question'] && text(post.createdAt, 40)
         && (post.type != 'link' || (text(post.url, 2000) && post.url.matches('https?://.*')))
-        && post.votes is list && post.savedBy is list && post.comments is list;
+        && post.votes is list && post.savedBy is list && post.comments is list
+        && post.get('outdatedBy', []) is list;
     }
     function ownToggle(previous, next) {
       return next is list && next.toSet().size() == next.size()
@@ -139,6 +140,7 @@ service cloud.firestore {
         && request.resource.data.votes.size() == 0
         && request.resource.data.savedBy.size() == 0
         && request.resource.data.comments.size() == 0
+        && request.resource.data.get('outdatedBy', []).size() == 0
         && ((request.resource.data.audienceType == 'self' && request.resource.data.audienceId == me())
           || (request.resource.data.audienceType == 'user' && exists(/databases/$(database)/documents/users/$(request.resource.data.audienceId)))
           || (request.resource.data.audienceType == 'group' && member(request.resource.data.audienceId)));
@@ -147,6 +149,8 @@ service cloud.firestore {
             && ownToggle(resource.data.votes, request.resource.data.votes))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['savedBy'])
             && ownToggle(resource.data.savedBy, request.resource.data.savedBy))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outdatedBy'])
+            && ownToggle(resource.data.get('outdatedBy', []), request.resource.data.get('outdatedBy', [])))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
             && newComment(resource.data.comments, request.resource.data.comments)));
       allow delete: if signedIn() && resource.data.authorId == me();

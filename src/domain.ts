@@ -198,6 +198,7 @@ export function createService(
         createdAt: new Date().toISOString(),
         votes: [],
         savedBy: [],
+        outdatedBy: [],
         comments: [],
       };
       state.posts.push(p);
@@ -277,6 +278,14 @@ export function createService(
       p.votes = p.votes.includes(id)
         ? p.votes.filter((x) => x !== id)
         : [...p.votes, id];
+      return commit(p);
+    },
+    toggleOutdated(id: string, postId: string) {
+      const p = readablePost(id, postId);
+      const marks = p.outdatedBy ?? [];
+      p.outdatedBy = marks.includes(id)
+        ? marks.filter((other) => other !== id)
+        : [...marks, id];
       return commit(p);
     },
     addComment(id: string, postId: string, body: string) {

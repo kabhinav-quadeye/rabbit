@@ -306,7 +306,7 @@ export function createApi(options: Options = {}) {
         return;
       }
       const postMatch = path.match(
-        /^\/api\/posts\/([^/]+)\/(save|vote|comments)$/,
+        /^\/api\/posts\/([^/]+)\/(save|vote|outdated|comments)$/,
       );
       if (postMatch && req.method === "POST") {
         send(
@@ -314,7 +314,9 @@ export function createApi(options: Options = {}) {
             ? service.toggleSave(id, postMatch[1])
             : postMatch[2] === "vote"
               ? service.toggleVote(id, postMatch[1])
-              : service.addComment(id, postMatch[1], (await body(req)).body),
+              : postMatch[2] === "outdated"
+                ? service.toggleOutdated(id, postMatch[1])
+                : service.addComment(id, postMatch[1], (await body(req)).body),
         );
         return;
       }

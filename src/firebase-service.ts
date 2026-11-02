@@ -301,7 +301,9 @@ export function createFirebaseService(
         return group;
       });
     }
-    const postMatch = path.match(/^\/posts\/([^/]+)\/(save|vote|comments)$/);
+    const postMatch = path.match(
+      /^\/posts\/([^/]+)\/(save|vote|outdated|comments)$/,
+    );
     if (postMatch && method === "POST") {
       const ref = doc(db, "posts", postMatch[1]);
       return runTransaction(db, async (tx) => {
@@ -318,13 +320,20 @@ export function createFirebaseService(
             ? latest.toggleSave(uid, snapshot.id)
             : postMatch[2] === "vote"
               ? latest.toggleVote(uid, snapshot.id)
-              : latest.addComment(uid, snapshot.id, input.body);
+              : postMatch[2] === "outdated"
+                ? latest.toggleOutdated(uid, snapshot.id)
+                : latest.addComment(uid, snapshot.id, input.body);
         if (postMatch[2] === "comments") {
           tx.update(ref, { comments: arrayUnion(post.comments.at(-1)!) });
         } else {
-          const field = postMatch[2] === "save" ? "savedBy" : "votes";
+          const field =
+            postMatch[2] === "save"
+              ? "savedBy"
+              : postMatch[2] === "outdated"
+                ? "outdatedBy"
+                : "votes";
           tx.update(ref, {
-            [field]: post[field].includes(uid)
+            [field]: (post[field] ?? []).includes(uid)
               ? arrayUnion(uid)
               : arrayRemove(uid),
           });

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, Pressable, TextInput, Linking } from "react-native";
 import {
   ArrowUp,
+  ClockAlert,
   Bookmark,
   MessageCircle,
   ArrowUpRight,
@@ -50,6 +51,8 @@ export function PostCard({
     [error, setError] = useState("");
   const saved = post.savedBy.includes(data.currentUser.id),
     voted = post.votes.includes(data.currentUser.id);
+  const outdatedBy = post.outdatedBy ?? [];
+  const markedOutdated = outdatedBy.includes(data.currentUser.id);
   const audience =
     post.audienceType === "self"
       ? "Just me"
@@ -119,6 +122,32 @@ export function PostCard({
           {relativeTime(post.createdAt)}
         </Text>
       </View>
+      {!!outdatedBy.length && (
+        <View
+          accessibilityLiveRegion="polite"
+          style={[
+            s.row,
+            {
+              gap: 10,
+              alignItems: "flex-start",
+              backgroundColor: c.sand,
+              borderRadius: 9,
+              padding: 12,
+            },
+          ]}
+        >
+          <ClockAlert size={18} color={c.ink} style={{ marginTop: 2 }} />
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={s.label}>May be outdated</Text>
+            <Text style={[s.small, { color: c.ink }]}>
+              {outdatedBy.length === 1
+                ? "1 reader flagged this information."
+                : `${outdatedBy.length} readers flagged this information.`}{" "}
+              Check the latest details before relying on it.
+            </Text>
+          </View>
+        </View>
+      )}
       <View style={{ gap: 8 }}>
         <Pressable
           accessibilityRole="button"
@@ -224,13 +253,13 @@ export function PostCard({
           },
         ]}
       >
-        <View style={[s.row, { gap: 18 }]}>
+        <View style={[s.row, { gap: 12, flex: 1, flexWrap: "wrap" }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={voted ? "Remove useful vote" : "Mark useful"}
             disabled={!!busy}
             onPress={() => act("vote")}
-            style={[s.row, { gap: 5, minHeight: 32 }]}
+            style={[s.row, { gap: 5, minHeight: 48 }]}
           >
             <ArrowUp
               size={14}
@@ -250,12 +279,57 @@ export function PostCard({
             accessibilityRole="button"
             accessibilityLabel={`Comments on ${post.title}`}
             onPress={() => onOpen(post)}
-            style={[s.row, { gap: 6, minHeight: 32 }]}
+            style={[s.row, { gap: 6, minHeight: 48 }]}
           >
             <MessageCircle size={13} color={c.muted} />
             <Text style={[s.small, { fontSize: 11 }]}>
               {post.comments.length}{" "}
               {post.comments.length === 1 ? "reply" : "replies"}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              markedOutdated ? "Remove outdated mark" : "Mark outdated"
+            }
+            accessibilityState={{ disabled: !!busy, selected: markedOutdated }}
+            aria-pressed={markedOutdated}
+            disabled={!!busy}
+            onPress={() => act("outdated")}
+            style={({
+              pressed,
+              hovered,
+            }: {
+              pressed: boolean;
+              hovered?: boolean;
+            }) => [
+              s.row,
+              {
+                gap: 5,
+                minHeight: 48,
+                paddingHorizontal: 8,
+                borderRadius: 8,
+                backgroundColor: markedOutdated
+                  ? c.sand
+                  : pressed || hovered
+                    ? c.greenLight
+                    : "transparent",
+                opacity: busy ? 0.5 : 1,
+              },
+            ]}
+          >
+            <ClockAlert size={14} color={markedOutdated ? c.ink : c.muted} />
+            <Text
+              style={[
+                s.small,
+                { fontSize: 11, color: markedOutdated ? c.ink : c.muted },
+              ]}
+            >
+              {busy === "outdated"
+                ? "Updating…"
+                : markedOutdated
+                  ? "Marked outdated"
+                  : "Outdated?"}
             </Text>
           </Pressable>
         </View>
@@ -265,8 +339,9 @@ export function PostCard({
           disabled={!!busy}
           onPress={() => act("save")}
           style={{
-            minHeight: 32,
-            minWidth: 34,
+            minHeight: 48,
+            minWidth: 48,
+            alignSelf: "flex-start",
             alignItems: "center",
             justifyContent: "center",
           }}
