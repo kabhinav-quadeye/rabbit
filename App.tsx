@@ -230,9 +230,32 @@ function Rabbit() {
     setSearchQuery(query);
     scroll.current?.scrollTo({ y: 0, animated: false });
   }
-  async function postAction(id: string, action: string) {
-    await request(`/posts/${id}/${action}`, "POST", {});
-    await refresh();
+  async function postAction(id: string, action: string, input = {}) {
+    const updated = await request<Post>(
+      `/posts/${id}/${action}`,
+      "POST",
+      input,
+    );
+    const field =
+      action === "save"
+        ? "savedBy"
+        : action === "vote"
+          ? "votes"
+          : action === "outdated"
+            ? "outdatedBy"
+            : "comments";
+    // Separate interactions can finish out of order; retain newer unrelated fields.
+    setData(
+      (current) =>
+        current && {
+          ...current,
+          posts: current.posts.map((post) =>
+            post.id === updated.id
+              ? { ...post, [field]: updated[field] }
+              : post,
+          ),
+        },
+    );
   }
   async function publish(input: PostInput) {
     await request("/posts", "POST", input);
@@ -1630,8 +1653,7 @@ function Rabbit() {
           onTag={(t) => doSearch(`#${t}`)}
           onGroup={openGroup}
           onComment={async (id, body) => {
-            await request(`/posts/${id}/comments`, "POST", { body });
-            await refresh();
+            await postAction(id, "comments", { body });
           }}
         />
       )}

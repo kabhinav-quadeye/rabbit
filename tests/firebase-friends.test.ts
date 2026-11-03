@@ -155,6 +155,92 @@ test(
       };
       const postRef = (i: number) => doc(databases[i], "posts", post.id);
       await setDoc(postRef(0), post);
+      // Interactions must retain both readers' changes and reject forged direct writes.
+      for (const action of ["save", "vote", "comments"]) {
+        await assert.rejects(
+          eve(`/posts/${post.id}/${action}`, "POST", { body: "No access" }),
+          /access/i,
+        );
+      }
+      for (const field of ["votes", "savedBy"]) {
+        await assert.rejects(
+          updateDoc(postRef(2), { [field]: [e] }),
+          /permission/i,
+        );
+        await assert.rejects(
+          updateDoc(postRef(1), { [field]: [a] }),
+          /permission/i,
+        );
+        await updateDoc(postRef(1), { [field]: [b] });
+        await assert.rejects(
+          updateDoc(postRef(0), { [field]: [] }),
+          /permission/i,
+        );
+        await assert.rejects(
+          updateDoc(postRef(0), { [field]: [b, a, a] }),
+          /permission/i,
+        );
+        await assert.rejects(
+          updateDoc(postRef(0), { [field]: [b, a], body: "Rewritten" }),
+          /permission/i,
+        );
+      }
+      const comment = {
+        id: `comment-${suffix}`,
+        authorId: b,
+        body: "A helpful resource",
+        createdAt: new Date().toISOString(),
+      };
+      await assert.rejects(
+        updateDoc(postRef(0), { comments: [comment] }),
+        /permission/i,
+      );
+      await updateDoc(postRef(1), { comments: [comment] });
+      await assert.rejects(
+        updateDoc(postRef(1), { comments: [] }),
+        /permission/i,
+      );
+      await assert.rejects(
+        updateDoc(postRef(1), { comments: [{ ...comment, body: "Edited" }] }),
+        /permission/i,
+      );
+      await assert.rejects(
+        updateDoc(postRef(0), {
+          comments: [
+            comment,
+            {
+              ...comment,
+              id: "oversized",
+              authorId: a,
+              body: "x".repeat(4001),
+            },
+          ],
+        }),
+        /permission/i,
+      );
+      for (const action of ["save", "vote"]) {
+        // Bob removes only his own entry; concurrent transactions retain both readers.
+        await bob(`/posts/${post.id}/${action}`, "POST");
+        await Promise.all([
+          alice(`/posts/${post.id}/${action}`, "POST"),
+          bob(`/posts/${post.id}/${action}`, "POST"),
+        ]);
+      }
+      await Promise.all([
+        alice(`/posts/${post.id}/comments`, "POST", { body: "Alice's reply" }),
+        bob(`/posts/${post.id}/comments`, "POST", { body: "Bob's reply" }),
+      ]);
+      const reloaded = createFirebaseService(auths[0], databases[0]);
+      const persisted = (
+        await reloaded.request<Bootstrap>("/bootstrap")
+      ).posts.find((p) => p.id === post.id)!;
+      assert.deepEqual(new Set(persisted.votes), new Set([a, b]));
+      assert.deepEqual(new Set(persisted.savedBy), new Set([a, b]));
+      assert.equal(persisted.comments.length, 3);
+      assert.deepEqual(
+        new Set(persisted.comments.map((c) => c.body)),
+        new Set(["A helpful resource", "Alice's reply", "Bob's reply"]),
+      );
       await assert.rejects(
         updateDoc(postRef(2), { outdatedBy: [e] }),
         /permission/i,
