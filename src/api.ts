@@ -36,14 +36,20 @@ export async function request<T = unknown>(
   method = "GET",
   input?: unknown,
 ): Promise<T> {
-  if (firebaseService) return firebaseService.request<T>(path, method, input);
+  const agentManagement =
+    path === "/agent-connections" || path.startsWith("/agent-connections/");
+  if (firebaseService && !agentManagement)
+    return firebaseService.request<T>(path, method, input);
+  const bearer = firebaseAuth
+    ? await firebaseAuth.currentUser?.getIdToken()
+    : token;
   let response: Response;
   try {
     response = await fetch(`${base}/api${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
       },
       body: input === undefined ? undefined : JSON.stringify(input),
     });
@@ -60,6 +66,8 @@ export async function request<T = unknown>(
   return result as T;
 }
 export const loadSpace = () => request<Bootstrap>("/bootstrap");
+export const agentMcpUrl = () =>
+  `${base || (Platform.OS === "web" ? window.location.origin : `http://${nativeHost}:3001`)}/api/agent/mcp`;
 export const searchPosts = (query: string, scope: string) =>
   request<Post[]>(
     `/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}`,

@@ -61,6 +61,7 @@ import {
 import { Composer } from "./src/Composer";
 import { PostCard, PostDetail } from "./src/Posts";
 import { Friends } from "./src/Friends";
+import { Agents } from "./src/Agents";
 import { Circles, GroupForm } from "./src/Groups";
 import { Auth } from "./src/Auth";
 import {
@@ -1181,7 +1182,7 @@ function Rabbit() {
                     )}
                     {tab === "profile" && (
                       <>
-                        {profileMode !== "friends" && (
+                        {!["friends", "agents"].includes(profileMode) && (
                           <View
                             style={[
                               s.card,
@@ -1313,7 +1314,8 @@ function Rabbit() {
                                 gap: 7,
                                 flexWrap: "wrap",
                                 flexGrow: 1,
-                                flexShrink: 0,
+                                flexShrink: 1,
+                                minWidth: 0,
                               },
                             ]}
                           >
@@ -1343,6 +1345,13 @@ function Rabbit() {
                               style={{ minHeight: 48 }}
                             >
                               Friends
+                            </Chip>
+                            <Chip
+                              active={profileMode === "agents"}
+                              onPress={() => setProfileMode("agents")}
+                              style={{ minHeight: 48 }}
+                            >
+                              Agents
                             </Chip>
                           </View>
                           <Pressable
@@ -1386,7 +1395,9 @@ function Rabbit() {
                             </Text>
                           </Pressable>
                         </View>
-                        {profileMode === "friends" ? (
+                        {profileMode === "agents" ? (
+                          <Agents key={user.id} />
+                        ) : profileMode === "friends" ? (
                           <Friends
                             key={user.id}
                             data={data}

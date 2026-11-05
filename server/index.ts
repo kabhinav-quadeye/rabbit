@@ -5,6 +5,11 @@ const dbPath = process.env.DB_PATH ?? "data/rabbit.sqlite";
 mkdirSync(dirname(dbPath), { recursive: true });
 const app = createApi({
   dbPath,
+  firebaseProjectId:
+    process.env.EXPO_PUBLIC_BACKEND !== "local"
+      ? (process.env.FIREBASE_PROJECT_ID ??
+        process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID)
+      : undefined,
   staticDir: process.env.SERVE_WEB === "1" ? "dist" : undefined,
 });
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 3001);

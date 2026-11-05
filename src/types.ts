@@ -36,7 +36,22 @@ export type Post = {
   votes: string[];
   savedBy: string[];
   outdatedBy?: string[];
+  usefulVia?: Record<string, AgentAttribution>;
+  outdatedVia?: Record<string, AgentAttribution>;
   comments: Comment[];
+};
+export type AgentAttribution = {
+  connectionId: string;
+  name: string;
+  at: string;
+};
+export type AgentConnection = {
+  id: string;
+  name: string;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
 };
 export type FriendRequest = {
   id: string;

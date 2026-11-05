@@ -27,6 +27,7 @@ async function start(
       method,
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -35,6 +36,7 @@ async function start(
   };
   return {
     call,
+    url: `http://127.0.0.1:${address.port}/api`,
     stop: async () => {
       app.server.close();
       await once(app.server, "close");
@@ -46,6 +48,170 @@ const account = (name: string) => ({
   name,
   email: `${name.toLowerCase()}@example.com`,
   password: "test-password-123",
+});
+
+test("agent credentials are scoped, revocable and attribute retry-safe feedback", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rabbit-agent-"));
+  const dbPath = join(dir, "agent.sqlite");
+  let app = await start(dbPath);
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    const bob = (await app.call("/auth/register", "POST", account("Bob"))).data;
+    const post = (
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: "Reliable garden advice",
+          body: "Water at sunrise",
+          audienceType: "self",
+        },
+        alice.token,
+      )
+    ).data;
+    const secret = (
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: "Hidden garden",
+          body: "Bob only",
+          audienceType: "self",
+        },
+        bob.token,
+      )
+    ).data;
+    const created = await app.call(
+      "/agent-connections",
+      "POST",
+      { name: "Research helper" },
+      alice.token,
+    );
+    assert.equal(created.status, 201);
+    const { token, connection } = created.data;
+    assert.ok(token && token !== alice.token);
+    assert.equal("token" in connection, false);
+    assert.equal("hash" in connection, false);
+    assert.equal(
+      (await app.call("/bootstrap", "GET", undefined, token)).status,
+      401,
+    );
+    assert.equal(
+      (
+        await app.call(
+          "/agent-connections",
+          "POST",
+          { name: "Escalate" },
+          token,
+        )
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await app.call(
+          `/posts/${post.id}/comments`,
+          "POST",
+          { body: "attack" },
+          token,
+        )
+      ).status,
+      401,
+    );
+    const rpc = (name: string, args: unknown) =>
+      app.call(
+        "/agent/mcp",
+        "POST",
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name, arguments: args },
+        },
+        token,
+      );
+    const search = await rpc("search_posts", { query: "garden" });
+    assert.equal(search.status, 200);
+    assert.deepEqual(
+      search.data.result.structuredContent.posts.map((p: any) => p.id),
+      [post.id],
+    );
+    assert.equal(
+      (await rpc("read_post", { postId: secret.id })).data.result.isError,
+      true,
+    );
+    assert.equal(
+      (await rpc("read_post", { postId: post.id })).data.result
+        .structuredContent.body,
+      "Water at sunrise",
+    );
+    for (let i = 0; i < 2; i++) {
+      const mark = await rpc("set_feedback", {
+        postId: post.id,
+        kind: "useful",
+        active: true,
+      });
+      assert.equal(mark.data.result.isError, undefined);
+    }
+    await rpc("set_feedback", {
+      postId: post.id,
+      kind: "outdated",
+      active: true,
+    });
+    await app.stop();
+    app = await start(dbPath);
+    const feed = (await app.call("/bootstrap", "GET", undefined, alice.token))
+      .data;
+    assert.deepEqual(feed.posts[0].votes, [alice.user.id]);
+    assert.deepEqual(feed.posts[0].outdatedBy, [alice.user.id]);
+    assert.equal(
+      feed.posts[0].usefulVia[alice.user.id].name,
+      "Research helper",
+    );
+    assert.equal(
+      feed.posts[0].usefulVia[alice.user.id].connectionId,
+      connection.id,
+    );
+    const listing = (
+      await app.call("/agent-connections", "GET", undefined, alice.token)
+    ).data;
+    assert.equal(JSON.stringify(listing).includes(token), false);
+    assert.equal(listing.connections[0].name, "Research helper");
+    assert.equal(
+      (
+        await app.call(
+          `/agent-connections/${connection.id}/revoke`,
+          "POST",
+          {},
+          bob.token,
+        )
+      ).status,
+      404,
+    );
+    assert.equal(
+      (
+        await app.call(
+          `/agent-connections/${connection.id}/revoke`,
+          "POST",
+          {},
+          alice.token,
+        )
+      ).status,
+      200,
+    );
+    assert.equal((await rpc("search_posts", { query: "garden" })).status, 401);
+    // Human actions clear the current attribution, without changing the other mark.
+    const undo = (
+      await app.call(`/posts/${post.id}/vote`, "POST", {}, alice.token)
+    ).data;
+    assert.deepEqual(undo.votes, []);
+    assert.equal(undo.usefulVia[alice.user.id], undefined);
+    assert.equal(undo.outdatedVia[alice.user.id].name, "Research helper");
+  } finally {
+    await app.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("API requires authentication and never accepts a user id as a token", async () => {
@@ -420,5 +586,171 @@ test("outdated marks enforce access and persist across a SQLite restart", async 
   } finally {
     await app.stop();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("MCP rejects expired credentials, unsafe origins and invalid tools; bounds search and request rate", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const dir = mkdtempSync(join(tmpdir(), "rabbit-agent-limits-"));
+  const dbPath = join(dir, "agents.sqlite");
+  const app = await start(dbPath);
+  const db = new DatabaseSync(dbPath);
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    assert.equal(
+      (await app.call("/agent-connections", "POST", { name: " " }, alice.token))
+        .status,
+      400,
+    );
+    const created = (
+      await app.call(
+        "/agent-connections",
+        "POST",
+        { name: "Bounded helper" },
+        alice.token,
+      )
+    ).data;
+    const rpc = (name: string, args: unknown) =>
+      app.call(
+        "/agent/mcp",
+        "POST",
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name, arguments: args },
+        },
+        created.token,
+      );
+    for (const [name, args] of [
+      ["search_posts", { query: "" }],
+      ["search_posts", { query: "a", limit: 1000 }],
+      ["set_feedback", { postId: "x", kind: "saved", active: true }],
+      ["set_feedback", { postId: "x", kind: "useful", active: "yes" }],
+      ["delete_post", { postId: "x" }],
+    ] as const) {
+      const response = await rpc(name, args);
+      assert.ok(response.data.result?.isError || response.data.error);
+    }
+    for (let i = 0; i < 3; i++)
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: `Bounded result ${i}`,
+          body: "A".repeat(400),
+          audienceType: "self",
+        },
+        alice.token,
+      );
+    const first = (await rpc("search_posts", { query: "Bounded", limit: 2 }))
+      .data.result.structuredContent;
+    assert.equal(first.posts.length, 2);
+    assert.equal(first.posts[0].body.length, 300);
+    assert.equal(first.nextOffset, 2);
+    assert.equal("savedBy" in first.posts[0], false);
+    const second = (
+      await rpc("search_posts", {
+        query: "Bounded",
+        limit: 2,
+        offset: first.nextOffset,
+      })
+    ).data.result.structuredContent;
+    assert.equal(second.posts.length, 1);
+    assert.equal(second.nextOffset, null);
+    // Credentials are persisted as hashes, never as reusable secrets.
+    const row = db
+      .prepare("SELECT hash,data FROM agent_connections WHERE id=?")
+      .get(created.connection.id) as { hash: string; data: string };
+    assert.equal(row.hash.length, 64);
+    assert.equal(row.data.includes(created.token), false);
+    // Invalid tool calls consume the same budget as successful calls.
+    assert.equal(JSON.parse(row.data).requests, 7);
+    const value = JSON.parse(row.data);
+    db.prepare("UPDATE agent_connections SET data=? WHERE id=?").run(
+      JSON.stringify({
+        ...value,
+        window: Math.floor(Date.now() / 60000),
+        requests: 60,
+      }),
+      created.connection.id,
+    );
+    const limited = await rpc("search_posts", { query: "Bounded" });
+    assert.equal(limited.status, 429);
+    assert.match(limited.data.error, /limit/i);
+    db.prepare("UPDATE agent_connections SET data=? WHERE id=?").run(
+      JSON.stringify({ ...value, expiresAt: "2020-01-01T00:00:00Z" }),
+      created.connection.id,
+    );
+    assert.equal((await rpc("search_posts", { query: "Bounded" })).status, 401);
+  } finally {
+    db.close();
+    await app.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a real MCP client can initialize, discover tools, search and read; browser origins are denied", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StreamableHTTPClientTransport } =
+    await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const app = await start();
+  const client = new Client({ name: "rabbit-test-reader", version: "1.0.0" });
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    const post = (
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: "Client guide",
+          body: "Full source text",
+          audienceType: "self",
+        },
+        alice.token,
+      )
+    ).data;
+    const { token } = (
+      await app.call(
+        "/agent-connections",
+        "POST",
+        { name: "MCP client" },
+        alice.token,
+      )
+    ).data;
+    const originRequest = await fetch(app.url + "/agent/mcp", {
+      method: "POST",
+      headers: {
+        Origin: "https://untrusted.example",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    assert.equal(originRequest.status, 403);
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(app.url + "/agent/mcp"), {
+        requestInit: { headers: { Authorization: `Bearer ${token}` } },
+      }),
+    );
+    assert.deepEqual(
+      (await client.listTools()).tools.map((tool) => tool.name).sort(),
+      ["read_post", "search_posts", "set_feedback"],
+    );
+    const found = await client.callTool({
+      name: "search_posts",
+      arguments: { query: "guide" },
+    });
+    assert.equal((found.structuredContent as any).posts[0].id, post.id);
+    const read = await client.callTool({
+      name: "read_post",
+      arguments: { postId: post.id },
+    });
+    assert.equal((read.structuredContent as any).body, "Full source text");
+  } finally {
+    await client.close();
+    await app.stop();
   }
 });

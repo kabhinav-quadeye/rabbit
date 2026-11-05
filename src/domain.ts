@@ -5,6 +5,7 @@ import type {
   Post,
   PostInput,
   FriendRequest,
+  AgentAttribution,
 } from "./types.ts";
 
 export class AppError extends Error {
@@ -249,7 +250,11 @@ export function createService(
         .filter(Boolean);
       return structuredClone(
         visiblePosts(id).filter((p) => {
-          if ((scope === "groups" || scope === "circles") && p.audienceType !== "group") return false;
+          if (
+            (scope === "groups" || scope === "circles") &&
+            p.audienceType !== "group"
+          )
+            return false;
           if (
             scope === "personal" &&
             !(p.audienceType === "self" && p.authorId === id)
@@ -275,6 +280,7 @@ export function createService(
     },
     toggleVote(id: string, postId: string) {
       const p = readablePost(id, postId);
+      if (p.usefulVia) delete p.usefulVia[id];
       p.votes = p.votes.includes(id)
         ? p.votes.filter((x) => x !== id)
         : [...p.votes, id];
@@ -282,10 +288,39 @@ export function createService(
     },
     toggleOutdated(id: string, postId: string) {
       const p = readablePost(id, postId);
+      if (p.outdatedVia) delete p.outdatedVia[id];
       const marks = p.outdatedBy ?? [];
       p.outdatedBy = marks.includes(id)
         ? marks.filter((other) => other !== id)
         : [...marks, id];
+      return commit(p);
+    },
+    readPost(id: string, postId: string) {
+      return structuredClone(readablePost(id, postId));
+    },
+    setAgentFeedback(
+      id: string,
+      postId: string,
+      kind: "useful" | "outdated",
+      active: boolean,
+      via: AgentAttribution,
+    ) {
+      const p = readablePost(id, postId);
+      if (!["useful", "outdated"].includes(kind))
+        fail("Choose useful or outdated feedback.");
+      if (typeof active !== "boolean")
+        fail("Feedback active must be a boolean.");
+      const field = kind === "useful" ? "votes" : "outdatedBy";
+      const attribution = kind === "useful" ? "usefulVia" : "outdatedVia";
+      const marks = p[field] ?? [];
+      // A retry preserves the original source, including a previous human mark.
+      if (marks.includes(id) === active) return structuredClone(p);
+      p[field] = active
+        ? [...marks, id]
+        : marks.filter((other) => other !== id);
+      p[attribution] ??= {};
+      if (active) p[attribution][id] = structuredClone(via);
+      else delete p[attribution][id];
       return commit(p);
     },
     addComment(id: string, postId: string, body: string) {
