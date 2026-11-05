@@ -17,6 +17,8 @@ import {
   setDoc,
   arrayUnion,
   arrayRemove,
+  deleteField,
+  FieldPath,
   type Firestore,
 } from "firebase/firestore";
 import { createService } from "./domain.ts";
@@ -332,11 +334,21 @@ export function createFirebaseService(
               : postMatch[2] === "outdated"
                 ? "outdatedBy"
                 : "votes";
-          tx.update(ref, {
-            [field]: (post[field] ?? []).includes(uid)
-              ? arrayUnion(uid)
-              : arrayRemove(uid),
-          });
+          const transform = (post[field] ?? []).includes(uid)
+            ? arrayUnion(uid)
+            : arrayRemove(uid);
+          if (field === "savedBy") tx.update(ref, { [field]: transform });
+          else
+            tx.update(
+              ref,
+              field,
+              transform,
+              new FieldPath(
+                field === "votes" ? "usefulVia" : "outdatedVia",
+                uid,
+              ),
+              deleteField(),
+            );
         }
         return post;
       });

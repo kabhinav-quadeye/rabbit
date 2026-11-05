@@ -14,17 +14,27 @@ import { AppError, createService } from "./domain.ts";
 import { loginEmail } from "../src/identity.ts";
 import { seedState } from "./seed.ts";
 import type { State } from "../src/types.ts";
+import {
+  handleAgentRequest,
+  sqliteAgentStore,
+  type AgentStore,
+} from "./agents.ts";
+import { firebaseAgentStore } from "./firebase-agents.ts";
 
 type Options = {
   dbPath?: string;
   seed?: boolean;
   demoEnabled?: boolean;
   staticDir?: string;
+  agentStore?: AgentStore;
+  firebaseProjectId?: string;
 };
 export function createApi(options: Options = {}) {
   const demoEnabled =
     options.demoEnabled ??
-    (process.env.NODE_ENV !== "production" && process.env.DEMO_MODE !== "0");
+    (!options.firebaseProjectId &&
+      process.env.NODE_ENV !== "production" &&
+      process.env.DEMO_MODE !== "0");
   const db = new DatabaseSync(options.dbPath ?? "data/rabbit.sqlite");
   db.exec(
     `PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS credentials (email TEXT PRIMARY KEY, user_id TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires INTEGER NOT NULL);`,
@@ -64,6 +74,18 @@ export function createApi(options: Options = {}) {
       throw new AppError("Your session has ended. Please sign in again.", 401);
     return entry.user_id;
   };
+  const agents =
+    options.agentStore ??
+    (options.firebaseProjectId
+      ? firebaseAgentStore(options.firebaseProjectId)
+      : sqliteAgentStore(
+          db,
+          () => service,
+          async (token) =>
+            auth({
+              headers: { authorization: `Bearer ${token}` },
+            } as IncomingMessage),
+        ));
   const body = async (req: IncomingMessage) => {
     let value = "";
     for await (const chunk of req) {
@@ -104,6 +126,27 @@ export function createApi(options: Options = {}) {
       res.end(JSON.stringify(data));
     };
     try {
+      if (
+        path === "/api/agent/mcp" ||
+        path.startsWith("/api/agent-connections")
+      ) {
+        res.setHeader("Cache-Control", "no-store");
+        // Remote tools do not accept browser-originated requests, preventing DNS rebinding.
+        if (path === "/api/agent/mcp" && req.headers.origin)
+          throw new AppError(
+            "Browser origins cannot call this agent endpoint.",
+            403,
+          );
+        await handleAgentRequest(
+          agents,
+          req,
+          res,
+          path,
+          req.method === "POST" ? await body(req) : {},
+          send,
+        );
+        return;
+      }
       if (!path.startsWith("/api/")) {
         if (!options.staticDir) throw new AppError("Not found.", 404);
         const root = resolve(options.staticDir);
@@ -132,6 +175,7 @@ export function createApi(options: Options = {}) {
         send({ ok: true, demo: demoEnabled });
         return;
       }
+      if (options.firebaseProjectId) throw new AppError("Not found.", 404);
       if (path === "/api/auth/demo" && req.method === "POST") {
         if (!demoEnabled || !state.users.some((u) => u.id === "alex"))
           throw new AppError("Not found.", 404);

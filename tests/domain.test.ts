@@ -89,6 +89,47 @@ const fixture = (): State => ({
   ],
 });
 
+test("delegated feedback rechecks access, is idempotent and keeps other readers' marks", () => {
+  const app = createService(fixture());
+  const via = {
+    connectionId: "agent-1",
+    name: "Research helper",
+    at: "2026-11-05T00:00:00Z",
+  };
+  assert.throws(
+    () => app.setAgentFeedback("alice", "secret", "useful", true, via),
+    /access/i,
+  );
+  assert.throws(
+    () => app.setAgentFeedback("eve", "shared", "outdated", true, via),
+    /access/i,
+  );
+  assert.throws(
+    () => app.setAgentFeedback("alice", "shared", "saved" as any, true, via),
+    /feedback/i,
+  );
+  assert.throws(
+    () => app.setAgentFeedback("alice", "shared", "useful", "yes" as any, via),
+    /boolean/i,
+  );
+  app.toggleVote("bob", "shared");
+  app.setAgentFeedback("bob", "shared", "useful", true, via);
+  assert.equal(app.readPost("bob", "shared").usefulVia?.bob, undefined);
+  app.setAgentFeedback("alice", "shared", "useful", true, via);
+  app.setAgentFeedback("alice", "shared", "useful", true, via);
+  let post = app.readPost("alice", "shared");
+  assert.deepEqual(post.votes, ["bob", "alice"]);
+  assert.deepEqual(post.usefulVia?.alice, via);
+  app.setAgentFeedback("alice", "shared", "outdated", true, via);
+  post = app.setAgentFeedback("alice", "shared", "useful", false, via);
+  assert.deepEqual(post.votes, ["bob"]);
+  assert.equal(post.usefulVia?.alice, undefined);
+  assert.deepEqual(post.outdatedVia?.alice, via);
+  post = app.toggleOutdated("alice", "shared");
+  assert.equal(post.outdatedVia?.alice, undefined);
+  assert.throws(() => app.readPost("alice", "secret"), /access/i);
+});
+
 test("feed includes own notes, incoming direct posts and joined groups, newest first", () => {
   const app = createService(fixture());
   assert.deepEqual(
@@ -320,10 +361,7 @@ test("user-facing errors call groups circles", () => {
     () => app.addMembers("alice", "missing", ["bob"]),
     /circle not found/i,
   );
-  assert.throws(
-    () => app.createGroup("alice", { name: " " }),
-    /circle name/i,
-  );
+  assert.throws(() => app.createGroup("alice", { name: " " }), /circle name/i);
   assert.throws(
     () => app.createGroup("alice", { name: "Club", memberIds: ["eve"] }),
     /friends to a circle/i,

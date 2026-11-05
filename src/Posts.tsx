@@ -242,6 +242,19 @@ export function PostCard({
           ))}
         </View>
       )}
+      {(["useful", "outdated"] as const).map((kind) => {
+        const marks = kind === "useful" ? post.votes : outdatedBy;
+        const sources = kind === "useful" ? post.usefulVia : post.outdatedVia;
+        return Object.entries(sources ?? {})
+          .filter(([id]) => marks.includes(id))
+          .map(([id, via]) => (
+            <Text key={`${kind}:${id}`} style={s.small}>
+              {id === data.currentUser.id
+                ? `Marked ${kind} by ${via.name} on your behalf.`
+                : `${data.users.find((user) => user.id === id)?.name ?? "A reader"} marked ${kind} via ${via.name}.`}
+            </Text>
+          ));
+      })}
       <View
         style={[
           s.between,
