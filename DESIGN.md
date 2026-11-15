@@ -208,7 +208,7 @@ The library's light CSS variables differ slightly from the fixed JS palette; thi
 
 ## Layout
 
-The adaptive shell uses a persistent left rail (228px) at viewport widths of (960px) and above. Below that threshold, the three primary destinations—Home, labeled “Your space”; Recent, labeled “Recent posts”; and Profile—move into bottom navigation. Its items have a minimum height of (54px) and width of (88px).
+The adaptive shell uses a persistent left rail (228px) at viewport widths of (960px) and above. Below that threshold, the four primary destinations—Home, labeled “Your space”; Recent, labeled “Recent posts”; Goals; and Profile—move into bottom navigation. Its items have a minimum height of (54px) and width of (78px), so four fit at 360px.
 
 At (1230px) and above, a support column (278px) sits beside the flexible main column with a (28px) gap. The inner page is centered with a maximum width of (1190px). The reading column uses `minWidth: 0` so long content can wrap. Desktop outer horizontal padding is (40px), phone content padding is (18px); the header uses (20px) on phones. Page top padding is (34px) desktop and (26px) phone. Panel stacks commonly use (24px) gaps.
 
@@ -250,7 +250,7 @@ Standard labeled fields use a (48px) minimum height, white fill, one-pixel paper
 
 ### Navigation
 
-Desktop rail items are compact rows with a (45px) minimum height and control radius. Active rows use pale foliage, forest ink and semibold labels; inactive rows are transparent with muted regular labels. Hover uses a gentle tonal fill. Phone navigation is white with a top border, three equal destinations and icons above (10px) labels; active state uses forest and semibold without a filled tile.
+Desktop rail items are compact rows with a (45px) minimum height and control radius. Active rows use pale foliage, forest ink and semibold labels; inactive rows are transparent with muted regular labels. Hover uses a gentle tonal fill. Phone navigation is white with a top border, four equal destinations and icons above (10px) labels; active state uses forest and semibold without a filled tile.
 
 The Home compose/search switch has a softly tinted, outlined compact-panel container. Its selected segment is white with forest medium text; the other segment remains muted. It belongs inside Home rather than becoming a fourth primary destination.
 
@@ -260,6 +260,20 @@ The composer's audience button is a (36px) minimum-height chip with a (240px) ma
 
 This three-part signature is specific to the composer. Existing post metadata badges use a smaller lock badge and are not claimed to implement the same glyph-switching behavior.
 
+### Goals
+
+Goals reuse the circle vocabulary rather than adding a new one. The nav glyph is Lucide `Sprout`.
+
+- **Goal mark:** the group-icon rounded square in one of the five identity tone pairs, with a stroked glyph at (46%) (flag, footprints, book, leaf, languages, heart). Keep the tone pair together, as with circles.
+- **Momentum panel:** pale-foliage fill, (16px) radius, a card-title sentence in forest (“You completed 10 tasks across 3 goals in the last 7 days.”), seven day bars (today in forest, other days in a light sage) and one small follow-up line. It is a sentence, not KPI tiles. On Home it leads the main column on phones and tops the support column at (1230px) and above.
+- **Goal card:** a paper card with the goal mark, title, “done of total” line and a (6px) forest-on-sage progress bar, followed by the top three next tasks and a quiet “Add a task” row.
+- **Task row:** a (22px) circular checkbox (forest fill when done) with a 44px-equivalent hit area, regular body text and an (11px) meta line. Priority always pairs a signal glyph with its word (High in clay-peach ink, Medium in oat-sand ink, Low muted). Overdue uses clay-peach ink with the word “Overdue”, never the error colour. Done rows strike through in faint. Tree levels indent (26px) on desktop and (20px) on phones, up to four levels; a selected row uses pale foliage.
+- **Refresh:** a secondary button that takes the selected-chip treatment (pale foliage, selected border, forest ink) and a forest count badge while completions are pending. Completed rows stay in place with a forest “Undo” until Refresh.
+- **Task detail placement:** below (960px), a bottom sheet with a grab handle and top-only dialog radius (`Sheet placement="bottom"`); from (960px) to (1229px), a right-anchored sheet (`placement="side"`); at (1230px) and above, an inline (360px) paper panel in place of the support column, so the tree stays visible.
+- **Phone quick add:** a white bar with a top border, docked above the bottom navigation on a goal page, with a (44px) forest send button.
+
+Evidence: responsive web captures at 390px and 1440px from the goals browser suite. Native appearance is not verified.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -267,7 +281,7 @@ This three-part signature is specific to the composer. Existing post metadata ba
 - Do keep the composer audience visible and update its icon, tint and privacy wording together.
 - Do preserve actual DM Sans weight assets on web and native.
 - Do keep controls quiet, keyboard focus visible and explanatory text readable.
-- Do adapt the rail and support column to the observed breakpoints while preserving the three primary destinations.
+- Do adapt the rail and support column to the observed breakpoints while preserving the four primary destinations.
 
 ### Don't:
 - Don't use circle colors to replace the primary action color.

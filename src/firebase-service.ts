@@ -17,6 +17,7 @@ import {
   setDoc,
   arrayUnion,
   arrayRemove,
+  writeBatch,
   type Firestore,
 } from "firebase/firestore";
 import { createService } from "./domain.ts";
@@ -29,6 +30,8 @@ import type {
   Group,
   Bootstrap,
   PostInput,
+  Goal,
+  GoalTask,
 } from "./types.ts";
 
 const clean = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -152,6 +155,124 @@ export function createFirebaseService(
     space.currentUser.email = auth.currentUser!.email ?? undefined;
     return space;
   }
+  // Goals are private, so they load only the owner's documents and never the
+  // shared post state. The domain service validates; writes are atomic batches.
+  /** goalId scopes tasks to one goal; null skips tasks; undefined loads all. */
+  async function goalState(
+    uid: string,
+    goalId?: string | null,
+  ): Promise<State> {
+    const owned = (name: string) =>
+      query(collection(db, name), where("ownerId", "==", uid));
+    const [goalDocs, taskDocs] = await Promise.all([
+      getDocs(owned("goals")),
+      goalId === null
+        ? null
+        : getDocs(
+            goalId
+              ? query(owned("goalTasks"), where("goalId", "==", goalId))
+              : owned("goalTasks"),
+          ),
+    ]);
+    return {
+      users: [],
+      groups: [],
+      posts: [],
+      goals: goalDocs.docs.map((d) => d.data() as Goal),
+      goalTasks: taskDocs?.docs.map((d) => d.data() as GoalTask) ?? [],
+    };
+  }
+  async function commitGoalWrites(
+    sets: (Goal | GoalTask)[],
+    collectionName: "goals" | "goalTasks",
+    deletes: { name: "goals" | "goalTasks"; id: string }[] = [],
+  ) {
+    // Firestore batches hold 500 writes; goals hold at most 500 tasks.
+    const writes = [
+      ...sets.map((value) => ({ kind: "set" as const, value })),
+      ...deletes.map((target) => ({ kind: "delete" as const, target })),
+    ];
+    for (let i = 0; i < writes.length; i += 450) {
+      const batch = writeBatch(db);
+      for (const w of writes.slice(i, i + 450))
+        if (w.kind === "set")
+          batch.set(doc(db, collectionName, w.value.id), clean(w.value));
+        else batch.delete(doc(db, w.target.name, w.target.id));
+      await batch.commit();
+    }
+  }
+  async function goals(uid: string, path: string, method: string, input: any) {
+    const service = (state: State) => createService(state, undefined, newId);
+    if (path === "/goals" && method === "GET")
+      return service(await goalState(uid)).goalsOverview(uid);
+    if (path === "/goals" && method === "POST") {
+      const goal = service(await goalState(uid, null)).createGoal(uid, input);
+      await commitGoalWrites([goal], "goals");
+      return goal;
+    }
+    const goalMatch = path.match(/^\/goals\/([^/]+)(\/tasks)?$/);
+    if (goalMatch) {
+      const app = service(await goalState(uid, goalMatch[1]));
+      if (goalMatch[2] && method === "POST") {
+        const changed = app.createTask(uid, goalMatch[1], input);
+        await commitGoalWrites(changed, "goalTasks");
+        return changed;
+      }
+      if (!goalMatch[2] && method === "PATCH") {
+        const goal = app.updateGoal(uid, goalMatch[1], input);
+        await commitGoalWrites([goal], "goals");
+        return goal;
+      }
+      if (!goalMatch[2] && method === "DELETE") {
+        const removed = app.deleteGoal(uid, goalMatch[1]);
+        // Tasks first, so a partial failure never leaves orphaned tasks.
+        await commitGoalWrites([], "goalTasks", [
+          ...removed.taskIds.map((id) => ({ name: "goalTasks" as const, id })),
+        ]);
+        await commitGoalWrites([], "goals", [
+          { name: "goals", id: removed.id },
+        ]);
+        return removed;
+      }
+    }
+    const taskMatch = path.match(/^\/tasks\/([^/]+)(?:\/(complete|reopen))?$/);
+    if (taskMatch) {
+      let task: GoalTask | undefined;
+      try {
+        task = (await getDoc(doc(db, "goalTasks", taskMatch[1]))).data() as
+          GoalTask | undefined;
+      } catch {
+        task = undefined; // Missing and foreign tasks both read as not found.
+      }
+      if (!task) throw new Error("Task not found.");
+      const app = service(await goalState(uid, task.goalId));
+      if (taskMatch[2] === "complete" && method === "POST") {
+        const changed = app.completeTask(uid, task.id, input?.cascade === true);
+        await commitGoalWrites(changed, "goalTasks");
+        return changed;
+      }
+      if (taskMatch[2] === "reopen" && method === "POST") {
+        const changed = app.reopenTask(uid, task.id);
+        await commitGoalWrites(changed, "goalTasks");
+        return changed;
+      }
+      if (!taskMatch[2] && method === "PATCH") {
+        const updated = app.updateTask(uid, task.id, input);
+        await commitGoalWrites([updated], "goalTasks");
+        return updated;
+      }
+      if (!taskMatch[2] && method === "DELETE") {
+        const removed = app.deleteTask(uid, task.id);
+        await commitGoalWrites(
+          [],
+          "goalTasks",
+          removed.ids.map((id) => ({ name: "goalTasks" as const, id })),
+        );
+        return removed;
+      }
+    }
+    throw new Error("Not found.");
+  }
   async function handle(path: string, method: string, input: any) {
     if (path === "/health")
       return { ok: true, demo: false, backend: "firebase" };
@@ -206,6 +327,8 @@ export function createFirebaseService(
     }
     const uid = id();
     if (path === "/bootstrap" && method === "GET") return load();
+    if (/^\/(goals|tasks)(\/|$)/.test(path))
+      return goals(uid, path, method, input);
     const url = new URL(path, "https://rabbit.local");
     const state = await load();
     const service = createService(state, undefined, newId);
