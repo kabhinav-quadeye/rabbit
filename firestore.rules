@@ -155,5 +155,60 @@ service cloud.firestore {
             && newComment(resource.data.comments, request.resource.data.comments)));
       allow delete: if signedIn() && resource.data.authorId == me();
     }
+    // Goals are private to their owner. Domain code keeps the cascade
+    // invariant (a done task has no open descendants); rules enforce privacy,
+    // structure and immutable fields.
+    function calendarDate(value) {
+      return value == null || (value is string && value.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'));
+    }
+    function stamp(value) { return value is string && value.size() > 0 && value.size() <= 40; }
+    function validGoal(g, goalId) {
+      return g.keys().hasAll(['id', 'ownerId', 'title', 'why', 'color', 'icon', 'targetDate', 'status', 'createdAt', 'updatedAt', 'reachedAt'])
+        && g.keys().hasOnly(['id', 'ownerId', 'title', 'why', 'color', 'icon', 'targetDate', 'status', 'createdAt', 'updatedAt', 'reachedAt'])
+        && g.id == goalId && text(g.title, 120) && g.title.size() > 0 && text(g.why, 500)
+        && g.color in ['sage', 'peach', 'lavender', 'blue', 'sand']
+        && g.icon in ['run', 'book', 'leaf', 'language', 'flag', 'heart']
+        && calendarDate(g.targetDate) && g.status in ['active', 'reached', 'archived']
+        && stamp(g.createdAt) && stamp(g.updatedAt) && (g.reachedAt == null || stamp(g.reachedAt));
+    }
+    match /goals/{goalId} {
+      allow read: if signedIn() && resource.data.ownerId == me();
+      allow create: if signedIn() && request.resource.data.ownerId == me()
+        && validGoal(request.resource.data, goalId);
+      allow update: if signedIn() && resource.data.ownerId == me()
+        && validGoal(request.resource.data, goalId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['title', 'why', 'color', 'icon', 'targetDate', 'status', 'updatedAt', 'reachedAt']);
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+    function validTask(t, taskId) {
+      return t.keys().hasAll(['id', 'ownerId', 'goalId', 'parentId', 'depth', 'description', 'notes', 'priority', 'dueDate', 'status', 'createdAt', 'updatedAt', 'completedAt'])
+        && t.keys().hasOnly(['id', 'ownerId', 'goalId', 'parentId', 'depth', 'description', 'notes', 'priority', 'dueDate', 'status', 'createdAt', 'updatedAt', 'completedAt'])
+        && t.id == taskId && t.goalId is string && (t.parentId == null || t.parentId is string)
+        && t.depth is int && t.depth >= 0 && t.depth <= 3
+        && text(t.description, 500) && t.description.size() > 0 && text(t.notes, 10000)
+        && t.priority in ['none', 'low', 'medium', 'high'] && calendarDate(t.dueDate)
+        && t.status in ['open', 'done'] && stamp(t.createdAt) && stamp(t.updatedAt)
+        && ((t.status == 'open' && t.completedAt == null) || (t.status == 'done' && stamp(t.completedAt)));
+    }
+    function validParent(t) {
+      let parent = getAfter(/databases/$(database)/documents/goalTasks/$(t.parentId)).data;
+      return parent.ownerId == me() && parent.goalId == t.goalId && t.depth == parent.depth + 1;
+    }
+    match /goalTasks/{taskId} {
+      allow read: if signedIn() && resource.data.ownerId == me();
+      allow create: if signedIn() && request.resource.data.ownerId == me()
+        && validTask(request.resource.data, taskId)
+        && request.resource.data.status == 'open'
+        && get(/databases/$(database)/documents/goals/$(request.resource.data.goalId)).data.ownerId == me()
+        && (request.resource.data.parentId == null
+          ? request.resource.data.depth == 0
+          : validParent(request.resource.data));
+      allow update: if signedIn() && resource.data.ownerId == me()
+        && validTask(request.resource.data, taskId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['description', 'notes', 'priority', 'dueDate', 'status', 'updatedAt', 'completedAt']);
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
   }
 }

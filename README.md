@@ -53,10 +53,11 @@ On the web, choose **Continue with Google**. Firebase opens Google's OAuth flow 
 - **Circles:** create a circle and select existing people. Members can add existing users, giving them access to the circle's old and new posts.
   Circles are called `group` in code, API routes and Firestore (`groups` collection, `audienceType: "group"`); only user-facing wording says circle.
 - **Conversation:** mark useful, save/unsave, and add comments. Atomic array updates preserve other users' simultaneous changes.
+- **Goals:** a private tab for breaking big goals into a tree of tasks (up to four levels). Home shows each goal's next three actionable tasks (leaf tasks ranked by priority, then due date, then age) and what you completed in the last seven days. Completing a task keeps it in place with Undo until you tap Refresh. Tasks have a priority, due date, sub-tasks and notes. Completed tasks are hidden by default. See [docs/goals.md](docs/goals.md).
 - **Profile:** edit name and bio, browse your posts and saved items, and sign out.
 - **Accounts:** register with a username or email and password, or use Google on web. Firebase owns credential checking and session refresh.
 
-Firestore rules enforce the same privacy model independently of the UI: only authors, direct recipients, and circle members can read posts. A person can change only their own useful/save markers and append comments under their own identity. Public profile documents omit email addresses and credentials. Only circle members can add members; membership changes cannot remove existing members or change the owner.
+Goals and tasks (`goals`, `goalTasks`) are readable and writable only by their owner; rules also check that a sub-task's parent belongs to the same goal and that ownership, goal and parent never change. Firestore rules enforce the same privacy model independently of the UI: only authors, direct recipients, and circle members can read posts. A person can change only their own useful/save markers and append comments under their own identity. Public profile documents omit email addresses and credentials. Only circle members can add members; membership changes cannot remove existing members or change the owner.
 
 Search operates over the current account's accessible Firestore posts. Screens refresh after actions and when reloading the app; live multi-device subscriptions and server-side full-text indexing are not implemented.
 

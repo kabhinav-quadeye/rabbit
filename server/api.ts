@@ -87,7 +87,10 @@ export function createApi(options: Options = {}) {
       "Access-Control-Allow-Headers",
       "Content-Type, Authorization",
     );
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PATCH, DELETE, OPTIONS",
+    );
     res.setHeader("X-Content-Type-Options", "nosniff");
     if (req.method === "OPTIONS") {
       res.writeHead(204);
@@ -318,6 +321,47 @@ export function createApi(options: Options = {}) {
                 ? service.toggleOutdated(id, postMatch[1])
                 : service.addComment(id, postMatch[1], (await body(req)).body),
         );
+        return;
+      }
+      if (path === "/api/goals" && req.method === "GET") {
+        send(service.goalsOverview(id));
+        return;
+      }
+      if (path === "/api/goals" && req.method === "POST") {
+        send(service.createGoal(id, await body(req)), 201);
+        return;
+      }
+      const goalMatch = path.match(/^\/api\/goals\/([^/]+)(\/tasks)?$/);
+      if (goalMatch && goalMatch[2] && req.method === "POST") {
+        send(service.createTask(id, goalMatch[1], await body(req)), 201);
+        return;
+      }
+      if (goalMatch && !goalMatch[2] && req.method === "PATCH") {
+        send(service.updateGoal(id, goalMatch[1], await body(req)));
+        return;
+      }
+      if (goalMatch && !goalMatch[2] && req.method === "DELETE") {
+        send(service.deleteGoal(id, goalMatch[1]));
+        return;
+      }
+      const taskMatch = path.match(
+        /^\/api\/tasks\/([^/]+)(?:\/(complete|reopen))?$/,
+      );
+      if (taskMatch && taskMatch[2] && req.method === "POST") {
+        const input = await body(req);
+        send(
+          taskMatch[2] === "complete"
+            ? service.completeTask(id, taskMatch[1], input.cascade === true)
+            : service.reopenTask(id, taskMatch[1]),
+        );
+        return;
+      }
+      if (taskMatch && !taskMatch[2] && req.method === "PATCH") {
+        send(service.updateTask(id, taskMatch[1], await body(req)));
+        return;
+      }
+      if (taskMatch && !taskMatch[2] && req.method === "DELETE") {
+        send(service.deleteTask(id, taskMatch[1]));
         return;
       }
       throw new AppError("Not found.", 404);

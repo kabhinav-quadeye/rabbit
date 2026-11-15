@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Rabbit · Goals UX proposal (issue #13)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --primary:#2F5843;--bg:#F8F9F4;--paper:#FFFFFF;--ink:#27332D;--muted:#6D756E;--faint:#92998F;
+    --green-light:#E8EEE1;--border:#E5E8DE;--sidebar:#F1F3EB;--sel-border:#D3DEC8;
+    --sage:#E4ECDD;--sage-ink:#4F6945;--peach:#F6E8DD;--peach-ink:#99643F;
+    --lavender:#ECE8F4;--lavender-ink:#776196;--sand:#F3EEDA;--sand-ink:#8E7839;--blue:#E5EDF3;--blue-ink:#4F6C89;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"DM Sans",sans-serif;color:var(--ink);background:#E9EBE4;padding:40px;font-size:14px;line-height:22px}
+  h1.doc{font-size:28px;letter-spacing:-.7px;font-weight:600;margin-bottom:4px}
+  p.doc{color:var(--muted);max-width:900px;margin-bottom:28px}
+  .board{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start;margin-bottom:56px}
+  .cap{font-size:12px;color:var(--muted);margin:10px 4px 0;max-width:390px;line-height:18px}
+  .cap b{color:var(--ink);font-weight:600}
+
+  /* frames */
+  .phone{width:390px;height:844px;background:var(--bg);border-radius:28px;overflow:hidden;position:relative;border:1px solid #D9DCD2;display:flex;flex-direction:column}
+  .desk{width:1440px;height:900px;background:var(--bg);border-radius:14px;overflow:hidden;display:flex;border:1px solid #D9DCD2}
+  .scroll{flex:1;overflow:hidden}
+
+  /* shared */
+  .row{display:flex;align-items:center}.between{display:flex;align-items:center;justify-content:space-between}
+  .h-display{font-size:34px;line-height:43px;letter-spacing:-1px;font-weight:600}
+  .h-headline{font-size:28px;line-height:36px;letter-spacing:-.7px;font-weight:600}
+  .h-title{font-size:20px;letter-spacing:-.5px;font-weight:600}
+  .sub{color:var(--muted);font-size:14px;line-height:22px}
+  .small{font-size:12px;line-height:18px;color:var(--muted)}
+  .card{background:var(--paper);border:1px solid var(--border);border-radius:16px}
+  .btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border-radius:9px;font-size:13px;font-weight:500;border:1px solid var(--border);background:var(--paper);color:var(--ink);white-space:nowrap}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn.stale{background:var(--green-light);border-color:var(--sel-border);color:var(--primary)}
+  .btn svg{width:16px;height:16px}
+  .count{background:var(--primary);color:#fff;border-radius:9px;font-size:11px;font-weight:600;padding:0 7px;line-height:18px}
+  svg{stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .mark{border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .mark svg{width:46%;height:46%}
+  .t-sage{background:var(--sage);color:var(--sage-ink)}.t-lav{background:var(--lavender);color:var(--lavender-ink)}.t-peach{background:var(--peach);color:var(--peach-ink)}
+  .bar{height:6px;border-radius:3px;background:var(--sage);overflow:hidden}.bar i{display:block;height:100%;background:var(--primary);border-radius:3px}
+
+  /* momentum */
+  .momentum{background:var(--green-light);border-radius:16px;padding:20px 22px}
+  .momentum .lead{font-size:19px;line-height:27px;letter-spacing:-.4px;font-weight:600;color:var(--primary)}
+  .momentum .lead b{font-weight:700}
+  .week{display:flex;gap:6px;align-items:flex-end;margin-top:14px;height:56px}
+  .day{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .day i{display:block;width:100%;max-width:26px;border-radius:5px;background:#C9D7BF}
+  .day.today i{background:var(--primary)}
+  .day span{font-size:10px;line-height:12px;color:var(--muted)}
+  .day.today span{color:var(--primary);font-weight:600}
+
+  /* tasks */
+  .task{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)}
+  .check{width:22px;height:22px;border-radius:11px;border:1.6px solid #B9C0B4;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center}
+  .check.on{background:var(--primary);border-color:var(--primary);color:#fff}
+  .check.on svg{width:13px;height:13px;stroke-width:2.6}
+  .task .desc{font-size:14px;line-height:21px}
+  .task.done .desc{color:var(--faint);text-decoration:line-through}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;font-size:11px;line-height:16px;color:var(--muted)}
+  .pri{display:inline-flex;align-items:center;gap:4px;font-weight:500}
+  .pri.high{color:var(--peach-ink)}.pri.med{color:var(--sand-ink)}
+  .pri svg{width:11px;height:11px}
+  .crumb{color:var(--faint)}
+  .undo{margin-left:auto;font-size:12px;font-weight:600;color:var(--primary);padding-top:1px}
+  .addline{display:flex;align-items:center;gap:10px;padding:11px 0 2px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+  .addline svg{width:16px;height:16px}
+
+  /* goal card */
+  .goal{padding:18px 20px 12px}
+  .goal-head{display:flex;gap:12px;align-items:center}
+  .goal-title{font-size:17px;line-height:23px;font-weight:600;letter-spacing:-.3px}
+  .chev{margin-left:auto;color:var(--faint)}
+  .chev svg{width:18px;height:18px}
+
+  /* nav */
+  .bottomnav{display:flex;justify-content:space-around;background:var(--paper);border-top:1px solid var(--border);padding:5px 0 18px}
+  .bottomnav div{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:80px;min-height:54px;justify-content:center;font-size:10px;color:var(--muted)}
+  .bottomnav div.on{color:var(--primary);font-weight:600}
+  .bottomnav svg{width:20px;height:20px}
+  .phead{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;gap:6px;align-items:center;font-weight:700;font-size:20px;color:var(--primary);letter-spacing:-.5px}
+  .brand svg{width:22px;height:22px;fill:var(--primary);stroke:none}
+  .avatar{width:30px;height:30px;border-radius:15px;background:var(--sage);color:var(--sage-ink);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+
+  .rail{width:228px;background:var(--sidebar);border-right:1px solid var(--border);padding:30px 18px;display:flex;flex-direction:column;gap:7px}
+  .rail .item{display:flex;gap:12px;align-items:center;min-height:45px;padding:0 15px;border-radius:9px;color:var(--muted);font-size:13px}
+  .rail .item.on{background:var(--green-light);color:var(--primary);font-weight:600}
+  .rail svg{width:18px;height:18px}
+  .seg{display:inline-flex;gap:4px;background:var(--sidebar);border:1px solid var(--border);border-radius:10px;padding:3px}
+  .seg span{padding:5px 12px;border-radius:7px;font-size:12px;color:var(--muted)}
+  .seg span.on{background:var(--paper);color:var(--primary);font-weight:500}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:7px;border:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .chip.on{background:var(--green-light);border-color:var(--sel-border);color:var(--primary);font-weight:500}
+  .chip svg{width:13px;height:13px}
+  .label{font-size:13px;font-weight:600;margin-bottom:8px}
+
+  /* tree */
+  .tree .node{display:flex;gap:10px;align-items:flex-start;padding:10px 12px 10px 0;border-top:1px solid var(--border)}
+  .tree .tog{width:18px;color:var(--faint);flex-shrink:0;padding-top:2px}
+  .tree .tog svg{width:16px;height:16px}
+  .tree .kids{font-size:11px;color:var(--muted);margin-left:auto;white-space:nowrap;padding-top:2px}
+  .tree .node.sel{background:var(--green-light);border-radius:9px;border-top-color:transparent}
+  .ind1{padding-left:26px!important}.ind2{padding-left:52px!important}
+
+  .dock{position:absolute;left:0;right:0;bottom:77px;background:var(--paper);border-top:1px solid var(--border);padding:10px 14px;display:flex;gap:10px;align-items:center}
+  .dock .field{flex:1;height:44px;border:1px solid var(--border);border-radius:9px;display:flex;align-items:center;padding:0 14px;color:var(--muted);font-size:14px}
+  .send{width:44px;height:44px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center}
+  .send svg{width:18px;height:18px}
+
+  .scrim{position:absolute;inset:0;background:rgba(29,42,31,.35)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;top:96px;background:var(--paper);border-radius:18px 18px 0 0;padding:8px 22px 0;display:flex;flex-direction:column}
+  .grab{width:38px;height:4px;border-radius:2px;background:#D6DAD0;margin:0 auto 10px}
+  .notes{border:1px solid var(--border);border-radius:9px;padding:12px 14px;min-height:96px;color:var(--ink);font-size:13px;line-height:21px}
+  .sheetfoot{margin-top:auto;border-top:1px solid var(--border);padding:12px 0 26px;display:flex;justify-content:space-between;align-items:center}
+  .ann{display:inline-block;background:#FFF7C9;border:1px solid #E9DB8A;color:#6B5A10;font-size:11px;line-height:15px;border-radius:6px;padding:2px 6px;font-weight:500}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="sprout" viewBox="0 0 24 24"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></symbol>
+    <symbol id="pen" viewBox="0 0 24 24"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.4 2.6a2.1 2.1 0 1 1 3 3L12 15l-4 1 1-4Z"/></symbol>
+    <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+    <symbol id="refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+    <symbol id="flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.3 2a6 6 0 0 0 4-1.3.5.5 0 0 1 .7.4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 15c-3 0-5-2-8-2a6 6 0 0 0-4 1.5"/></symbol>
+    <symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="run" viewBox="0 0 24 24"><circle cx="13" cy="4" r="2"/><path d="m4 22 4-7 4 2 1-5 3 3h4"/><path d="m8 9 3-2 3 2"/></symbol>
+    <symbol id="lang" viewBox="0 0 24 24"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></symbol>
+    <symbol id="leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z"/><path d="M2 21c0-3 1.9-5.4 5.1-6"/></symbol>
+    <symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="sig" viewBox="0 0 24 24"><path d="M5 20v-4M12 20v-9M19 20V5"/></symbol>
+    <symbol id="rabbit" viewBox="0 0 24 24"><path d="M8 2c1.5 0 2.5 2.5 2.5 6.5 0 .8 0 1.5-.1 2.1A6 6 0 0 1 18 16c0 3.3-2.7 6-6 6s-6-2.7-6-6c0-2 .9-3.7 2.4-4.8C7.6 9.8 6 7 6 4.5 6 3 6.8 2 8 2Zm7 0c1.2 0 2 1 2 2.5 0 2-1.2 4.4-2.4 5.6a7 7 0 0 0-2.3-.9c.2-.7.2-1.4.2-2.2C12.5 4 13.5 2 15 2Z"/></symbol>
+  </defs>
+</svg>
+
+<h1 class="doc">Goals — UX proposal for issue #13</h1>
+<p class="doc">Rabbit's "private garden club bulletin" system extended with a fourth primary destination. Same paper surfaces, forest action, DM Sans, identity tones (now also used for goals) and flat cards. Yellow tags are annotations, not UI.</p>
+
+<!-- ================= PHONE ================= -->
+<div class="board">
+
+<!-- P1: Goals home -->
+<div>
+<div class="phone">
+  <div class="phead"><div class="brand"><svg><use href="#rabbit"/></svg>rabbit.</div><div class="avatar">AL</div></div>
+  <div class="scroll" style="padding:24px 18px 0">
+    <div class="h-headline">What are you working toward?</div>
+    <div class="sub" style="margin-top:6px">Big ambitions, one small step at a time.</div>
+
+    <div class="momentum" style="margin-top:18px">
+      <div class="lead">You completed <b>10 tasks</b> across <b>3 goals</b> in the last 7 days.</div>
+      <div class="week">
+        <div class="day"><i style="height:10px"></i><span>M</span></div>
+        <div class="day"><i style="height:22px"></i><span>T</span></div>
+        <div class="day"><i style="height:4px"></i><span>W</span></div>
+        <div class="day"><i style="height:16px"></i><span>T</span></div>
+        <div class="day"><i style="height:28px"></i><span>F</span></div>
+        <div class="day"><i style="height:4px"></i><span>S</span></div>
+        <div class="day today"><i style="height:10px"></i><span>Today</span></div>
+      </div>
+      <div class="small" style="margin-top:10px;color:var(--sage-ink)">4 more than the week before. Keep it going.</div>
+    </div>
+
+    <div class="between" style="margin:22px 0 12px">
+      <div class="h-title">Up next</div>
+      <div class="row" style="gap:8px">
+        <span class="btn stale"><svg><use href="#refresh"/></svg>Refresh <span class="count">1</span></span>
+        <span class="btn primary" style="padding:0 12px"><svg><use href="#plus"/></svg>Goal</span>
+      </div>
+    </div>
+
+    <div class="card goal">
+      <div class="goal-head">
+        <div class="mark t-sage" style="width:38px;height:38px"><svg><use href="#run"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div class="goal-title">Run a half marathon</div>
+          <div class="small">8 of 15 done · by 12 Apr</div>
+        </div>
+        <span class="chev"><svg><use href="#right"/></svg></span>
+      </div>
+      <div class="bar" style="margin:12px 0 4px"><i style="width:53%"></i></div>
+      <div class="task">
+        <span class="check"></span>
+        <div style="flex:1"><div class="desc">Book a gait analysis at the running store</div>
+          <div class="meta"><span class="pri high"><svg><use href="#sig"/></svg>High</span><span>Due Fri</span><span class="crumb">in Gear</span></div></div>
+      </div>
+      <div class="task done">
+        <span class="check on"><svg><use href="#check"/></svg></span>
+        <div style="flex:1"><div class="desc">Run 5 km on Tuesday</div></div>
+        <span class="undo">Undo</span>
+      </div>
+      <div class="task">
+        <span class="check"></span>
+        <div style="flex:1"><div class="desc">Pick a 12-week training plan</div>
+          <div class="meta"><span class="pri med"><svg><use href="#sig"/></svg>Medium</span></div></div>
+      </div>
+      <div class="addline"><svg><use href="#plus"/></svg>Add a task</div>
+    </div>
+
+    <div class="card goal" style="margin-top:14px">
+      <div class="goal-head">
+        <div class="mark t-lav" style="width:38px;height:38px"><svg><use href="#lang"/></svg></div>
+        <div style="flex:1"><div class="goal-title">Hold a 10-minute chat in Spanish</div>
+          <div class="small">3 of 11 done</div></div>
+        <span class="chev"><svg><use href="#right"/></svg></span>
+      </div>
+      <div class="bar" style="margin:12px 0 4px"><i style="width:27%"></i></div>
+    </div>
+  </div>
+  <div class="bottomnav">
+    <div><svg><use href="#pen"/></svg>Your space</div>
+    <div><svg><use href="#clock"/></svg>Recent</div>
+    <div class="on"><svg><use href="#sprout"/></svg>Goals</div>
+    <div><svg><use href="#user"/></svg>Profile</div>
+  </div>
+</div>
+<p class="cap"><b>1 · Goals home (390px).</b> Momentum sentence leads, quoting the issue. Each goal shows its top 3 actionable leaf tasks. Ticking strikes the row in place with Undo, and Refresh gets a count badge. Nothing reorders until the person taps Refresh. Bottom nav grows to four tabs (min 80px each, which fits 390px).</p>
+</div>
+
+<!-- P2: Goal detail tree + docked add -->
+<div>
+<div class="phone">
+  <div class="phead"><div class="row" style="gap:8px;color:var(--muted);font-size:13px"><svg style="width:18px;height:18px"><use href="#left"/></svg>Goals</div><svg style="width:20px;height:20px;color:var(--muted)"><use href="#more"/></svg></div>
+  <div class="scroll" style="padding:22px 18px 0">
+    <div class="row" style="gap:12px">
+      <div class="mark t-sage" style="width:44px;height:44px"><svg><use href="#run"/></svg></div>
+      <div><div class="h-title" style="font-size:22px">Run a half marathon</div><div class="small">Target 12 Apr 2027 · 148 days left</div></div>
+    </div>
+    <div class="sub" style="margin-top:12px;font-size:13px">Why it matters: prove to myself I can train for something for months.</div>
+    <div class="row" style="gap:10px;margin-top:12px"><div class="bar" style="flex:1"><i style="width:53%"></i></div><span class="small" style="color:var(--ink);font-weight:500">8 / 15</span></div>
+
+    <div class="between" style="margin:20px 0 6px">
+      <div class="seg"><span class="on">All tasks</span><span>Up next</span></div>
+      <span class="small">Show done · 8</span>
+    </div>
+
+    <div class="tree">
+      <div class="node"><span class="tog"><svg><use href="#down"/></svg></span><span class="check"></span><div style="flex:1"><div class="desc">Gear</div></div><span class="kids">1 of 3</span></div>
+      <div class="node ind1"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Book a gait analysis</div><div class="meta"><span class="pri high"><svg><use href="#sig"/></svg>High</span><span>Due Fri</span></div></div></div>
+      <div class="node ind1"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Buy two pairs of socks</div></div></div>
+      <div class="node"><span class="tog"><svg><use href="#right"/></svg></span><span class="check"></span><div style="flex:1"><div class="desc">Weeks 1–4 base training</div></div><span class="kids">5 of 9</span></div>
+      <div class="node"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Pick a 12-week training plan</div><div class="meta"><span class="pri med"><svg><use href="#sig"/></svg>Medium</span></div></div></div>
+      <div class="node"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Register for the city half</div><div class="meta"><span>Due 1 Dec</span></div></div></div>
+    </div>
+    <div style="margin-top:14px"><span class="ann">Tap a row → task sheet (3). Indent 26px per level, max 4 levels.</span></div>
+  </div>
+  <div class="dock"><div class="field">Add a task to this goal…</div><div class="send"><svg><use href="#send"/></svg></div></div>
+  <div class="bottomnav">
+    <div><svg><use href="#pen"/></svg>Your space</div>
+    <div><svg><use href="#clock"/></svg>Recent</div>
+    <div class="on"><svg><use href="#sprout"/></svg>Goals</div>
+    <div><svg><use href="#user"/></svg>Profile</div>
+  </div>
+</div>
+<p class="cap"><b>2 · Goal page.</b> The tree is shown in creation order, with completed tasks hidden by default ("Show done · 8"). "Up next" uses the same ranked leaf list as Home. The add bar is docked at the bottom and rises with the keyboard. It stays focused after each submit so the person can break a goal down quickly.</p>
+</div>
+
+<!-- P3: Task bottom sheet -->
+<div>
+<div class="phone">
+  <div class="phead"><div class="row" style="gap:8px;color:var(--muted);font-size:13px"><svg style="width:18px;height:18px"><use href="#left"/></svg>Goals</div></div>
+  <div class="scroll"></div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="between"><span class="small">Run a half marathon › Gear</span><svg style="width:20px;height:20px;color:var(--muted)"><use href="#x"/></svg></div>
+    <div class="row" style="gap:12px;margin-top:12px;align-items:flex-start">
+      <span class="check" style="width:26px;height:26px;border-radius:13px;margin-top:2px"></span>
+      <div style="font-size:19px;line-height:27px;font-weight:600;letter-spacing:-.4px">Book a gait analysis at the running store</div>
+    </div>
+
+    <div class="label" style="margin-top:20px">Priority</div>
+    <div class="row" style="gap:6px"><span class="chip">None</span><span class="chip">Low</span><span class="chip">Medium</span><span class="chip on"><svg><use href="#sig"/></svg>High</span></div>
+
+    <div class="label" style="margin-top:16px">Due</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><span class="chip">Today</span><span class="chip">Tomorrow</span><span class="chip on"><svg><use href="#cal"/></svg>Fri 20 Nov</span><span class="chip">Clear</span></div>
+
+    <div class="between" style="margin-top:18px"><div class="label" style="margin:0">Sub-tasks</div><span class="small">0 of 2</span></div>
+    <div class="task" style="padding:9px 0"><span class="check"></span><div class="desc">Call to check Saturday slots</div></div>
+    <div class="task" style="padding:9px 0"><span class="check"></span><div class="desc">Bring current shoes</div></div>
+    <div class="addline" style="padding-top:9px"><svg><use href="#plus"/></svg>Add a sub-task</div>
+
+    <div class="between" style="margin-top:16px"><div class="label" style="margin:0">Notes</div><span class="small">Saved</span></div>
+    <div class="notes">Stride Lab, MG Road. ₹1,500, ~40 min. Ask about neutral vs stability shoes.</div>
+
+    <div class="sheetfoot"><span class="small" style="font-weight:500">Delete task</span><span class="btn primary"><svg><use href="#check"/></svg>Mark complete</span></div>
+  </div>
+</div>
+<p class="cap"><b>3 · Task sheet.</b> A bottom sheet on phones and a side panel on desktop. Description, priority, due date and notes edit inline and save automatically. The person adds a sub-task here, in the context of the selected task. If open sub-tasks remain, "Mark complete" asks: <i>"Also complete 2 open sub-tasks?"</i></p>
+</div>
+</div>
+
+<!-- ================= DESKTOP ================= -->
+<div class="board">
+<div>
+<div class="desk">
+  <div class="rail">
+    <div class="brand" style="font-size:28px;margin:0 0 40px 10px"><svg style="width:28px;height:28px"><use href="#rabbit"/></svg>rabbit.</div>
+    <div class="item"><svg><use href="#pen"/></svg>Your space</div>
+    <div class="item"><svg><use href="#clock"/></svg>Recent posts</div>
+    <div class="item on"><svg><use href="#sprout"/></svg>Goals</div>
+    <div class="item"><svg><use href="#user"/></svg>Profile</div>
+  </div>
+  <div style="flex:1;padding:34px 40px;display:flex;gap:28px">
+    <!-- main: goal detail -->
+    <div style="flex:1;min-width:0">
+      <div class="row" style="gap:8px;color:var(--muted);font-size:13px;margin-bottom:18px"><svg style="width:16px;height:16px"><use href="#left"/></svg>All goals</div>
+      <div class="between">
+        <div class="row" style="gap:14px">
+          <div class="mark t-sage" style="width:52px;height:52px"><svg><use href="#run"/></svg></div>
+          <div><div class="h-display">Run a half marathon</div><div class="sub">Target 12 Apr 2027 · 148 days left · 8 of 15 done</div></div>
+        </div>
+        <span class="btn"><svg><use href="#more"/></svg></span>
+      </div>
+      <div class="bar" style="margin:18px 0 22px"><i style="width:53%"></i></div>
+
+      <div class="card" style="padding:18px 22px">
+        <div class="between" style="margin-bottom:6px"><div class="seg"><span class="on">All tasks</span><span>Up next</span></div><span class="small">Show done · 8</span></div>
+        <div class="tree">
+          <div class="node"><span class="tog"><svg><use href="#down"/></svg></span><span class="check"></span><div style="flex:1"><div class="desc">Gear</div></div><span class="kids">1 of 3</span></div>
+          <div class="node ind1 sel"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Book a gait analysis at the running store</div><div class="meta"><span class="pri high"><svg><use href="#sig"/></svg>High</span><span>Due Fri</span><span>2 sub-tasks</span></div></div></div>
+          <div class="node ind1"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Buy two pairs of socks</div></div></div>
+          <div class="node"><span class="tog"><svg><use href="#right"/></svg></span><span class="check"></span><div style="flex:1"><div class="desc">Weeks 1–4 base training</div></div><span class="kids">5 of 9</span></div>
+          <div class="node"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Pick a 12-week training plan</div><div class="meta"><span class="pri med"><svg><use href="#sig"/></svg>Medium</span></div></div></div>
+          <div class="node"><span class="tog"></span><span class="check"></span><div style="flex:1"><div class="desc">Register for the city half</div><div class="meta"><span>Due 1 Dec</span></div></div></div>
+        </div>
+        <div class="row" style="gap:10px;margin-top:10px;border:1px solid var(--border);border-radius:9px;height:44px;padding:0 14px;color:var(--muted)"><svg style="width:16px;height:16px"><use href="#plus"/></svg>Add a task to this goal… <span class="small" style="margin-left:auto">Enter ↵</span></div>
+      </div>
+    </div>
+    <!-- side panel: task detail -->
+    <div class="card" style="width:360px;padding:22px;align-self:flex-start">
+      <div class="between"><span class="small">Gear</span><svg style="width:18px;height:18px;color:var(--muted)"><use href="#x"/></svg></div>
+      <div class="row" style="gap:12px;margin-top:10px;align-items:flex-start"><span class="check" style="margin-top:3px"></span><div style="font-size:19px;line-height:27px;font-weight:600;letter-spacing:-.4px">Book a gait analysis at the running store</div></div>
+      <div class="label" style="margin-top:18px">Priority</div>
+      <div class="row" style="gap:6px"><span class="chip">None</span><span class="chip">Low</span><span class="chip">Medium</span><span class="chip on">High</span></div>
+      <div class="label" style="margin-top:14px">Due</div>
+      <div class="row" style="gap:6px"><span class="chip">Today</span><span class="chip">Tomorrow</span><span class="chip on"><svg><use href="#cal"/></svg>Fri 20 Nov</span></div>
+      <div class="between" style="margin-top:16px"><div class="label" style="margin:0">Sub-tasks</div><span class="small">0 of 2</span></div>
+      <div class="task" style="padding:8px 0"><span class="check"></span><div class="desc">Call to check Saturday slots</div></div>
+      <div class="task" style="padding:8px 0"><span class="check"></span><div class="desc">Bring current shoes</div></div>
+      <div class="addline" style="padding-top:8px"><svg><use href="#plus"/></svg>Add a sub-task</div>
+      <div class="between" style="margin-top:14px"><div class="label" style="margin:0">Notes</div><span class="small">Saved</span></div>
+      <div class="notes">Stride Lab, MG Road. ₹1,500, ~40 min. Ask about neutral vs stability shoes.</div>
+      <div class="between" style="margin-top:16px"><span class="small" style="font-weight:500">Delete</span><span class="btn primary"><svg><use href="#check"/></svg>Mark complete</span></div>
+    </div>
+  </div>
+</div>
+<p class="cap" style="max-width:900px"><b>4 · Desktop goal page (1440px).</b> The task detail replaces the support column at ≥1230px, giving a split view that keeps the tree visible while the person edits. Between 960 and 1229px it opens as a right-anchored sheet. The selected row uses pale foliage, as selected recipients do. The add field is always visible at the end of the tree.</p>
+</div>
+</div>
+
+</body>
+</html>

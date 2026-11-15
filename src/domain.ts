@@ -5,7 +5,12 @@ import type {
   Post,
   PostInput,
   FriendRequest,
+  Goal,
+  GoalTask,
+  GoalInput,
+  TaskInput,
 } from "./types.ts";
+import { MAX_DEPTH, ancestors, descendants } from "./goals.ts";
 
 export class AppError extends Error {
   status: number;
@@ -28,9 +33,14 @@ export function createService(
   initial: State,
   persist: (state: State) => void = () => {},
   randomUUID: () => string = () => globalThis.crypto.randomUUID(),
+  now: () => Date = () => new Date(),
 ) {
   const state: State = structuredClone(initial);
   state.friendRequests ??= [];
+  state.goals ??= [];
+  state.goalTasks ??= [];
+  const goals = state.goals,
+    goalTasks = state.goalTasks;
   const requests = state.friendRequests;
   const friendIds = (id: string) =>
     requests
@@ -79,6 +89,43 @@ export function createService(
       .filter((p) => canRead(id, p))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   };
+  const tonesList = ["sage", "peach", "lavender", "blue", "sand"] as const;
+  const goalIcons = [
+    "run",
+    "book",
+    "leaf",
+    "language",
+    "flag",
+    "heart",
+  ] as const;
+  const priorities = ["none", "low", "medium", "high"] as const;
+  const calendarDate = (value: unknown, label: string) => {
+    if (value === null || value === undefined || value === "") return null;
+    const match =
+      typeof value === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const date =
+      match && new Date(Date.UTC(+match[1], +match[2] - 1, +match[3]));
+    if (!match || !date || date.toISOString().slice(0, 10) !== value)
+      return fail(`${label} must be a valid date.`);
+    return value as string;
+  };
+  const ownGoal = (id: string, goalId: string): Goal =>
+    goals.find((g) => g.id === goalId && g.ownerId === id) ??
+    fail("Goal not found.", 404);
+  const ownTask = (id: string, taskId: string): GoalTask =>
+    goalTasks.find((t) => t.id === taskId && t.ownerId === id) ??
+    fail("Task not found.", 404);
+  const reopen = (list: GoalTask[], stamp: string) =>
+    list
+      .filter((t) => t.status === "done")
+      .map((t) => {
+        t.status = "open";
+        t.completedAt = null;
+        t.updatedAt = stamp;
+        return t;
+      });
+  const plural = (n: number, word: string) =>
+    `${n} ${word}${n === 1 ? "" : "s"}`;
   return {
     bootstrap(id: string) {
       return structuredClone({
@@ -297,6 +344,170 @@ export function createService(
         createdAt: new Date().toISOString(),
       });
       return commit(p);
+    },
+    goalsOverview(id: string) {
+      return structuredClone({
+        goals: goals.filter((g) => g.ownerId === id),
+        tasks: goalTasks.filter((t) => t.ownerId === id),
+      });
+    },
+    createGoal(id: string, input: GoalInput) {
+      const title = text(input.title, "Goal title", 120);
+      if (
+        goals.filter((g) => g.ownerId === id && g.status !== "archived")
+          .length >= 50
+      )
+        fail("You can have up to 50 goals in progress. Archive one first.");
+      const stamp = now().toISOString();
+      const g: Goal = {
+        id: randomUUID(),
+        ownerId: id,
+        title,
+        why: text(input.why ?? "", "Why it matters", 500, false),
+        color: tonesList.includes(input.color as any) ? input.color! : "sage",
+        icon: goalIcons.includes(input.icon as any) ? input.icon! : "flag",
+        targetDate: calendarDate(input.targetDate, "Target date"),
+        status: "active",
+        createdAt: stamp,
+        updatedAt: stamp,
+        reachedAt: null,
+      };
+      goals.push(g);
+      return commit(g);
+    },
+    updateGoal(id: string, goalId: string, input: GoalInput) {
+      const g = ownGoal(id, goalId);
+      const next = { ...g };
+      if (input.title !== undefined)
+        next.title = text(input.title, "Goal title", 120);
+      if (input.why !== undefined)
+        next.why = text(input.why, "Why it matters", 500, false);
+      if (input.color !== undefined) {
+        if (!tonesList.includes(input.color as any))
+          fail("Choose a valid colour.");
+        next.color = input.color;
+      }
+      if (input.icon !== undefined) {
+        if (!goalIcons.includes(input.icon as any))
+          fail("Choose a valid icon.");
+        next.icon = input.icon;
+      }
+      if (input.targetDate !== undefined)
+        next.targetDate = calendarDate(input.targetDate, "Target date");
+      const stamp = now().toISOString();
+      if (input.status !== undefined && input.status !== g.status) {
+        if (!["active", "reached", "archived"].includes(input.status))
+          fail("Choose a valid goal status.");
+        if (
+          input.status !== "archived" &&
+          g.status === "archived" &&
+          goals.filter((x) => x.ownerId === id && x.status !== "archived")
+            .length >= 50
+        )
+          fail("You can have up to 50 goals in progress. Archive one first.");
+        next.status = input.status;
+        next.reachedAt = input.status === "reached" ? stamp : null;
+      }
+      next.updatedAt = stamp;
+      Object.assign(g, next);
+      return commit(g);
+    },
+    deleteGoal(id: string, goalId: string) {
+      const g = ownGoal(id, goalId);
+      const taskIds = goalTasks
+        .filter((t) => t.goalId === g.id)
+        .map((t) => t.id);
+      goals.splice(goals.indexOf(g), 1);
+      const remaining = goalTasks.filter((t) => t.goalId !== g.id);
+      goalTasks.splice(0, goalTasks.length, ...remaining);
+      return commit({ id: g.id, taskIds });
+    },
+    /** Returns the new task first, followed by any done ancestors it reopened. */
+    createTask(id: string, goalId: string, input: TaskInput) {
+      const g = ownGoal(id, goalId);
+      const description = text(input.description, "Task description", 500);
+      if (goalTasks.filter((t) => t.goalId === g.id).length >= 500)
+        fail("A goal can hold up to 500 tasks.");
+      const priority = input.priority ?? "none";
+      if (!priorities.includes(priority)) fail("Choose a valid priority.");
+      let parent: GoalTask | null = null;
+      if (input.parentId) {
+        parent = ownTask(id, input.parentId);
+        if (parent.goalId !== g.id)
+          fail("A sub-task must belong to the same goal as its parent.");
+        if (parent.depth + 1 > MAX_DEPTH)
+          fail(`Tasks can be nested up to ${MAX_DEPTH + 1} levels.`);
+      }
+      const stamp = now().toISOString();
+      const t: GoalTask = {
+        id: randomUUID(),
+        ownerId: id,
+        goalId: g.id,
+        parentId: parent?.id ?? null,
+        depth: parent ? parent.depth + 1 : 0,
+        description,
+        notes: text(input.notes ?? "", "Notes", 10000, false),
+        priority,
+        dueDate: calendarDate(input.dueDate, "Due date"),
+        status: "open",
+        createdAt: stamp,
+        updatedAt: stamp,
+        completedAt: null,
+      };
+      const reopened = parent
+        ? reopen([parent, ...ancestors(goalTasks, parent)], stamp)
+        : [];
+      goalTasks.push(t);
+      return commit([t, ...reopened]);
+    },
+    updateTask(id: string, taskId: string, input: TaskInput) {
+      const t = ownTask(id, taskId);
+      const next = { ...t };
+      if (input.description !== undefined)
+        next.description = text(input.description, "Task description", 500);
+      if (input.notes !== undefined)
+        next.notes = text(input.notes, "Notes", 10000, false);
+      if (input.priority !== undefined) {
+        if (!priorities.includes(input.priority))
+          fail("Choose a valid priority.");
+        next.priority = input.priority;
+      }
+      if (input.dueDate !== undefined)
+        next.dueDate = calendarDate(input.dueDate, "Due date");
+      next.updatedAt = now().toISOString();
+      Object.assign(t, next);
+      return commit(t);
+    },
+    /** Completes a task; with cascade, also every open descendant. Returns changed tasks. */
+    completeTask(id: string, taskId: string, cascade: boolean) {
+      const t = ownTask(id, taskId);
+      const open = descendants(goalTasks, t.id).filter(
+        (x) => x.status === "open",
+      );
+      if (open.length && !cascade)
+        fail(`This task has ${plural(open.length, "open sub-task")}.`, 409);
+      const stamp = now().toISOString();
+      const changed = [t, ...open].filter((x) => x.status === "open");
+      for (const x of changed) {
+        x.status = "done";
+        x.completedAt = stamp;
+        x.updatedAt = stamp;
+      }
+      return commit(changed);
+    },
+    /** Reopens a task and any done ancestors. Returns changed tasks. */
+    reopenTask(id: string, taskId: string) {
+      const t = ownTask(id, taskId);
+      return commit(
+        reopen([t, ...ancestors(goalTasks, t)], now().toISOString()),
+      );
+    },
+    deleteTask(id: string, taskId: string) {
+      const t = ownTask(id, taskId);
+      const ids = [t.id, ...descendants(goalTasks, t.id).map((x) => x.id)];
+      const remaining = goalTasks.filter((x) => !ids.includes(x.id));
+      goalTasks.splice(0, goalTasks.length, ...remaining);
+      return commit({ ids });
     },
     updateProfile(id: string, input: Partial<User>) {
       const u = user(id);
