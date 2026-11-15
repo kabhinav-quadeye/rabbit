@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, Linking } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  Linking,
+  ActivityIndicator,
+} from "react-native";
 import {
   ArrowUp,
   ClockAlert,
@@ -257,9 +264,34 @@ export function PostCard({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={voted ? "Remove useful vote" : "Mark useful"}
+            accessibilityState={{
+              disabled: !!busy,
+              selected: voted,
+              busy: busy === "vote",
+            }}
+            aria-pressed={voted}
+            aria-busy={busy === "vote"}
             disabled={!!busy}
             onPress={() => act("vote")}
-            style={[s.row, { gap: 5, minHeight: 48 }]}
+            style={({
+              pressed,
+              hovered,
+            }: {
+              pressed: boolean;
+              hovered?: boolean;
+            }) => [
+              s.row,
+              {
+                gap: 5,
+                minHeight: 48,
+                minWidth: 48,
+                paddingHorizontal: 8,
+                borderRadius: 8,
+                backgroundColor:
+                  voted || pressed || hovered ? c.greenLight : "transparent",
+                opacity: busy ? 0.5 : 1,
+              },
+            ]}
           >
             <ArrowUp
               size={14}
@@ -272,7 +304,7 @@ export function PostCard({
                 { fontSize: 11, color: voted ? c.green : c.muted },
               ]}
             >
-              {post.votes.length} useful
+              {busy === "vote" ? "Updating…" : `${post.votes.length} useful`}
             </Text>
           </Pressable>
           <Pressable
@@ -336,22 +368,43 @@ export function PostCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={saved ? "Unsave post" : "Save post"}
+          accessibilityState={{
+            disabled: !!busy,
+            selected: saved,
+            busy: busy === "save",
+          }}
+          aria-pressed={saved}
+          aria-busy={busy === "save"}
           disabled={!!busy}
           onPress={() => act("save")}
-          style={{
+          style={({
+            pressed,
+            hovered,
+          }: {
+            pressed: boolean;
+            hovered?: boolean;
+          }) => ({
             minHeight: 48,
             minWidth: 48,
             alignSelf: "flex-start",
             alignItems: "center",
             justifyContent: "center",
-          }}
+            borderRadius: 8,
+            backgroundColor:
+              saved || pressed || hovered ? c.greenLight : "transparent",
+            opacity: busy ? 0.5 : 1,
+          })}
         >
-          <Bookmark
-            size={15}
-            color={saved ? c.green : c.muted}
-            fill={saved ? c.green : "transparent"}
-            strokeWidth={1.7}
-          />
+          {busy === "save" ? (
+            <ActivityIndicator size="small" color={c.green} />
+          ) : (
+            <Bookmark
+              size={15}
+              color={saved ? c.green : c.muted}
+              fill={saved ? c.green : "transparent"}
+              strokeWidth={1.7}
+            />
+          )}
         </Pressable>
       </View>
       {!!error && (
@@ -386,6 +439,7 @@ export function PostDetail({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function send() {
+    if (busy || !comment.trim()) return;
     setBusy(true);
     setError("");
     try {
@@ -449,6 +503,7 @@ export function PostDetail({
             placeholder="Add something to the conversation…"
             placeholderTextColor={c.muted}
             value={comment}
+            editable={!busy}
             onChangeText={setComment}
             maxLength={4000}
             style={[
@@ -456,7 +511,11 @@ export function PostDetail({
               { minHeight: 80, textAlignVertical: "top", fontSize: 13 },
             ]}
           />
-          {!!error && <Text style={s.error}>{error}</Text>}
+          {!!error && (
+            <Text accessibilityRole="alert" style={s.error}>
+              {error}
+            </Text>
+          )}
           <Action
             label="Send comment"
             icon={Send}

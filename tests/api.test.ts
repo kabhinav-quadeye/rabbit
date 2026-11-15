@@ -422,3 +422,122 @@ test("outdated marks enforce access and persist across a SQLite restart", async 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("comments, saves and useful votes persist across SQLite restart and stay scoped to the authenticated reader", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rabbit-interactions-"));
+  const db = join(dir, "posts.sqlite");
+  let app = await start(db);
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    const bob = (await app.call("/auth/register", "POST", account("Bob"))).data;
+    const eve = (await app.call("/auth/register", "POST", account("Eve"))).data;
+    const post = (
+      await app.call(
+        "/posts",
+        "POST",
+        {
+          title: "A shared resource",
+          body: "Keep this",
+          audienceType: "user",
+          audienceId: bob.user.id,
+        },
+        alice.token,
+      )
+    ).data;
+    for (const action of ["save", "vote", "comments"]) {
+      const path = `/posts/${post.id}/${action}`;
+      assert.equal(
+        (await app.call(path, "POST", { body: "No session" })).status,
+        401,
+      );
+      assert.equal(
+        (await app.call(path, "POST", { body: "No access" }, eve.token)).status,
+        403,
+      );
+      const result = await app.call(
+        path,
+        "POST",
+        {
+          body: "  Thanks for sharing!  ",
+          userId: alice.user.id,
+          authorId: alice.user.id,
+        },
+        bob.token,
+      );
+      assert.equal(result.status, 200);
+    }
+    assert.equal(
+      (
+        await app.call(
+          `/posts/${post.id}/comments`,
+          "POST",
+          { body: " \n " },
+          bob.token,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await app.call(
+          `/posts/${post.id}/comments`,
+          "POST",
+          { body: "x".repeat(4001) },
+          bob.token,
+        )
+      ).status,
+      400,
+    );
+    await app.call(`/posts/${post.id}/vote`, "POST", {}, alice.token);
+    await app.call(`/posts/${post.id}/save`, "POST", {}, alice.token);
+    await app.stop();
+    app = await start(db);
+    const space = (await app.call("/bootstrap", "GET", undefined, bob.token))
+      .data;
+    assert.deepEqual(space.posts[0].savedBy, [bob.user.id, alice.user.id]);
+    assert.deepEqual(space.posts[0].votes, [bob.user.id, alice.user.id]);
+    assert.equal(space.posts[0].comments.length, 1);
+    assert.equal(space.posts[0].comments[0].authorId, bob.user.id);
+    assert.equal(space.posts[0].comments[0].body, "Thanks for sharing!");
+    assert.ok(space.posts[0].comments[0].id);
+    assert.ok(
+      Number.isFinite(Date.parse(space.posts[0].comments[0].createdAt)),
+    );
+    assert.equal(
+      (
+        await app.call(
+          "/search?q=resource&scope=saved",
+          "GET",
+          undefined,
+          bob.token,
+        )
+      ).data.length,
+      1,
+    );
+    assert.deepEqual(
+      (await app.call(`/posts/${post.id}/save`, "POST", {}, bob.token)).data
+        .savedBy,
+      [alice.user.id],
+    );
+    assert.deepEqual(
+      (await app.call(`/posts/${post.id}/vote`, "POST", {}, bob.token)).data
+        .votes,
+      [alice.user.id],
+    );
+    assert.deepEqual(
+      (
+        await app.call(
+          "/search?q=resource&scope=saved",
+          "GET",
+          undefined,
+          bob.token,
+        )
+      ).data,
+      [],
+    );
+  } finally {
+    await app.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
