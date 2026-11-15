@@ -23,7 +23,17 @@
       "backgroundColor": "#F8F9F4",
       "themeColor": "#2F5843"
     },
-    "plugins": ["expo-font", "expo-secure-store"],
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Rabbit to use your microphone to turn speech into draft text.",
+          "speechRecognitionPermission": "Allow Rabbit to transcribe speech into draft text you can review before posting."
+        }
+      ]
+    ],
     "scheme": "rabbit"
   }
 }

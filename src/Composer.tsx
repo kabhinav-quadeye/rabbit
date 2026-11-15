@@ -21,6 +21,7 @@ import { Textarea, TextareaInput } from "../components/ui/textarea";
 import { colors as c, fonts, s, tones } from "./theme";
 import { Action, Avatar, GroupIcon, Chip } from "./ui";
 import { Sheet } from "./Sheet";
+import { VoiceInput } from "./VoiceInput";
 import type { Bootstrap, PostInput } from "./types";
 type Props = {
   data: Bootstrap;
@@ -44,6 +45,7 @@ export function Composer({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [ready, setReady] = useState(false);
+  const [dictating, setDictating] = useState(false);
   const key = `rabbit.draft.${data.currentUser.id}`;
   useEffect(() => {
     let alive = true;
@@ -104,6 +106,7 @@ export function Composer({
         ? `Only you and ${person?.name.split(" ")[0]}`
         : "Only you can see this";
   async function publish() {
+    if (dictating || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -271,6 +274,19 @@ export function Composer({
             }}
           />
         </Textarea>
+        <VoiceInput
+          disabled={busy || !ready}
+          full={body.length >= 20000}
+          onActiveChange={setDictating}
+          onText={(text) =>
+            setBody((previous) =>
+              `${previous}${previous && !/\s$/.test(previous) ? " " : ""}${text}`.slice(
+                0,
+                20000,
+              ),
+            )
+          }
+        />
         {type === "link" && (
           <View
             style={[
@@ -374,7 +390,12 @@ export function Composer({
           icon={ArrowUpRight}
           onPress={publish}
           loading={busy}
-          disabled={!title.trim() || (type === "link" && !url.trim())}
+          disabled={
+            dictating ||
+            !ready ||
+            !title.trim() ||
+            (type === "link" && !url.trim())
+          }
           style={{ minHeight: 40, paddingHorizontal: 22 }}
         >
           Post
