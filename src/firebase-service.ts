@@ -1,4 +1,10 @@
 import {
+  searchWords,
+  mergeSearchStreams,
+  SEARCH_PAGE_SIZE,
+  indexToken,
+} from "./search.ts";
+import {
   createUserWithEmailAndPassword,
   deleteUser,
   signInWithEmailAndPassword,
@@ -19,6 +25,11 @@ import {
   arrayRemove,
   writeBatch,
   type Firestore,
+  type QueryConstraint,
+  documentId,
+  orderBy,
+  startAfter,
+  limit,
 } from "firebase/firestore";
 import { createService } from "./domain.ts";
 import { loginEmail } from "./identity.ts";
@@ -154,6 +165,109 @@ export function createFirebaseService(
     const space = createService(state).bootstrap(uid);
     space.currentUser.email = auth.currentUser!.email ?? undefined;
     return space;
+  }
+  async function search(uid: string, url: URL) {
+    // Search deliberately runs before load(): no bootstrap/post scan per query.
+    const [userDocs, groupDocs] = await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(
+        query(
+          collection(db, "groups"),
+          where("memberIds", "array-contains", uid),
+        ),
+      ),
+    ]);
+    const users = userDocs.docs.map((d) => d.data() as User);
+    const groups = groupDocs.docs.map((d) => d.data() as Group);
+    const words = searchWords(url.searchParams.get("q") ?? "");
+    const cursor = url.searchParams.get("cursor") ?? "";
+    if (cursor.includes("/") || cursor.length > 1500)
+      throw new Error("Invalid search cursor. Start a new search.");
+    const branches: {
+      filters: QueryConstraint[];
+      author?: string;
+      circle?: string;
+    }[] = [
+      { filters: [where("authorId", "==", uid)], author: uid },
+      {
+        filters: [
+          where("audienceType", "==", "user"),
+          where("audienceId", "==", uid),
+        ],
+      },
+      ...groups.map((g) => ({
+        filters: [
+          where("audienceType", "==", "group"),
+          where("audienceId", "==", g.id),
+        ],
+        circle: g.id,
+      })),
+    ];
+    const matchingAuthors = users
+      .filter((u) => searchWords(`${u.name} ${u.handle}`).includes(words[0]))
+      .map((u) => u.id);
+    const filters: QueryConstraint[][] = [];
+    for (const branch of branches) {
+      const circleMatch =
+        branch.circle &&
+        searchWords(groups.find((g) => g.id === branch.circle)!.name).includes(
+          words[0],
+        );
+      if (
+        !words.length ||
+        circleMatch ||
+        (branch.author && matchingAuthors.includes(branch.author))
+      ) {
+        filters.push(branch.filters);
+      } else {
+        filters.push([
+          ...branch.filters,
+          where("searchTokens", "array-contains", indexToken(words[0])),
+        ]);
+        if (!branch.author)
+          for (const authorId of matchingAuthors)
+            filters.push([
+              ...branch.filters,
+              where("authorId", "==", authorId),
+            ]);
+      }
+    }
+    // Keep concurrent RPCs bounded even for accounts with many circles.
+    const streams: Post[][] = [];
+    for (let i = 0; i < filters.length; i += 8) {
+      streams.push(
+        ...(await Promise.all(
+          filters.slice(i, i + 8).map(async (f) => {
+            const snapshot = await getDocs(
+              query(
+                collection(db, "posts"),
+                ...f,
+                orderBy(documentId()),
+                ...(cursor ? [startAfter(cursor)] : []),
+                limit(SEARCH_PAGE_SIZE),
+              ),
+            );
+            return snapshot.docs.map(
+              (d) => ({ ...d.data(), id: d.id }) as Post,
+            );
+          }),
+        )),
+      );
+    }
+    const page = mergeSearchStreams(streams);
+    // Recheck actual content and domain permissions: client-written tokens are
+    // untrusted hints. Names come from current metadata, so renames stay fresh.
+    const app = createService({ users, groups, posts: page.posts });
+    const matches = new Set(
+      app
+        .search(
+          uid,
+          url.searchParams.get("q") ?? "",
+          url.searchParams.get("scope") ?? "all",
+        )
+        .map((p) => p.id),
+    );
+    return { ...page, posts: page.posts.filter((p) => matches.has(p.id)) };
   }
   // Goals are private, so they load only the owner's documents and never the
   // shared post state. The domain service validates; writes are atomic batches.
@@ -330,6 +444,7 @@ export function createFirebaseService(
     if (/^\/(goals|tasks)(\/|$)/.test(path))
       return goals(uid, path, method, input);
     const url = new URL(path, "https://rabbit.local");
+    if (url.pathname === "/search" && method === "GET") return search(uid, url);
     const state = await load();
     const service = createService(state, undefined, newId);
     if (url.pathname === "/users" && method === "GET")
@@ -388,12 +503,6 @@ export function createFirebaseService(
         return request;
       });
     }
-    if (url.pathname === "/search" && method === "GET")
-      return service.search(
-        uid,
-        url.searchParams.get("q") ?? "",
-        url.searchParams.get("scope") ?? "all",
-      );
     if (path === "/posts" && method === "POST") {
       const post = service.createPost(uid, input as PostInput);
       await setDoc(doc(db, "posts", post.id), clean(post));

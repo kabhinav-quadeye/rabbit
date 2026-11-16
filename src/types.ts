@@ -36,6 +36,7 @@ export type Post = {
   votes: string[];
   savedBy: string[];
   outdatedBy?: string[];
+  searchTokens?: string[];
   comments: Comment[];
 };
 export type FriendRequest = {
@@ -100,3 +101,5 @@ export type Bootstrap = State & {
 };
 export type PostInput = Pick<Post, "audienceType" | "title" | "body"> &
   Partial<Pick<Post, "audienceId" | "type" | "url" | "tags">>;
+
+export type SearchPage = { posts: Post[]; nextCursor: string | null };

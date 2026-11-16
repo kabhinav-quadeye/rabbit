@@ -176,13 +176,19 @@ test(
         await request(`/posts/${shared.id}/comments`, "POST", {
           body: " Thanks! ",
         });
-        const found = await request<Post[]>("/search?q=Firebase&scope=saved");
-        assert.equal(found.length, 1);
-        assert.equal(found[0].id, shared.id);
-        assert.equal(found[0].comments[0].body, "Thanks!");
-        assert.equal(found[0].comments[0].authorId, readerId);
+        const found = await request<{ posts: Post[] }>(
+          "/search?q=Firebase&scope=saved",
+        );
+        assert.equal(found.posts.length, 1);
+        assert.equal(found.posts[0].id, shared.id);
+        assert.equal(found.posts[0].comments[0].body, "Thanks!");
+        assert.equal(found.posts[0].comments[0].authorId, readerId);
         await request(`/posts/${shared.id}/save`, "POST");
-        assert.deepEqual(await request("/search?q=Firebase&scope=saved"), []);
+        assert.deepEqual(
+          (await request<{ posts: Post[] }>("/search?q=Firebase&scope=saved"))
+            .posts,
+          [],
+        );
       } finally {
         await deleteDoc(doc(databases[0], "posts", shared.id));
       }
