@@ -132,6 +132,11 @@ function Rabbit() {
   const [searchResults, setSearchResults] = useState<Post[]>([]),
     [searching, setSearching] = useState(false),
     [searchError, setSearchError] = useState("");
+  const [searchCursor, setSearchCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState("");
+  const searchGeneration = useRef(0);
+  const morePending = useRef(false);
   const [profileMode, setProfileMode] = useState("posts"),
     [editing, setEditing] = useState(false),
     [profileName, setProfileName] = useState(""),
@@ -189,12 +194,21 @@ function Rabbit() {
   useEffect(() => {
     if (mode !== "search" || !data) return;
     let active = true;
+    searchGeneration.current++;
+    morePending.current = false;
+    setLoadingMore(false);
+    setMoreError("");
+    setSearchResults([]);
+    setSearchCursor(null);
     setSearching(true);
     setSearchError("");
     const timer = setTimeout(() => {
       searchPosts(searchQuery, searchScope)
         .then((p) => {
-          if (active) setSearchResults(p);
+          if (active) {
+            setSearchResults(p.posts);
+            setSearchCursor(p.nextCursor);
+          }
         })
         .catch((e) => {
           if (active) setSearchError(e.message);
@@ -208,6 +222,29 @@ function Rabbit() {
       clearTimeout(timer);
     };
   }, [searchQuery, searchScope, mode, data]);
+  async function loadMoreSearch() {
+    if (!searchCursor || searching || morePending.current) return;
+    const generation = searchGeneration.current;
+    morePending.current = true;
+    setLoadingMore(true);
+    setMoreError("");
+    try {
+      const page = await searchPosts(searchQuery, searchScope, searchCursor);
+      if (generation !== searchGeneration.current) return;
+      setSearchResults((previous) => [
+        ...new Map([...previous, ...page.posts].map((p) => [p.id, p])).values(),
+      ]);
+      setSearchCursor(page.nextCursor);
+    } catch (error) {
+      if (generation === searchGeneration.current)
+        setMoreError((error as Error).message);
+    } finally {
+      if (generation === searchGeneration.current) {
+        morePending.current = false;
+        setLoadingMore(false);
+      }
+    }
+  }
   function navigate(next: Tab) {
     setTab(next);
     setSelectedGroup(null);
@@ -997,7 +1034,7 @@ function Rabbit() {
                                 <Text style={s.small}>
                                   {searching
                                     ? "Searching…"
-                                    : `${searchResults.length} posts`}
+                                    : `${searchResults.length} posts${searchCursor ? " so far" : ""}`}
                                 </Text>
                               </View>
                               {!!searchError ? (
@@ -1023,11 +1060,41 @@ function Rabbit() {
                                 !searching && (
                                   <View style={s.card}>
                                     <Empty
-                                      title="No threads found. Yet."
-                                      body="Try another word, a tag, or a wider filter. Your next useful discovery might be one search away."
+                                      title={
+                                        searchCursor
+                                          ? "Keep looking through your space"
+                                          : "No threads found. Yet."
+                                      }
+                                      body={
+                                        searchCursor
+                                          ? "No matches in this batch. Load more posts to continue your search."
+                                          : "Try another word, a tag, or a wider filter. Your next useful discovery might be one search away."
+                                      }
                                     />
                                   </View>
                                 )
+                              )}
+                              {!!moreError && (
+                                <Text accessibilityRole="alert" style={s.error}>
+                                  {moreError}
+                                </Text>
+                              )}
+                              {!!searchCursor && !searchError && (
+                                <Action
+                                  secondary
+                                  label={
+                                    moreError
+                                      ? "Try loading more again"
+                                      : "Load more posts"
+                                  }
+                                  loading={loadingMore}
+                                  disabled={searching}
+                                  onPress={loadMoreSearch}
+                                >
+                                  {moreError
+                                    ? "Try loading more again"
+                                    : "Load more posts"}
+                                </Action>
                               )}
                             </View>
                           )}

@@ -262,10 +262,11 @@ export function createApi(options: Options = {}) {
       }
       if (path === "/api/search" && req.method === "GET") {
         send(
-          service.search(
+          service.searchPage(
             id,
             url.searchParams.get("q") ?? "",
             url.searchParams.get("scope") ?? "all",
+            url.searchParams.get("cursor") ?? "",
           ),
         );
         return;

@@ -1,3 +1,10 @@
+import {
+  searchWords,
+  postSearchTokens,
+  searchableWords,
+  inSearchScope,
+  SEARCH_PAGE_SIZE,
+} from "./search.ts";
 import type {
   State,
   User,
@@ -89,6 +96,33 @@ export function createService(
       .filter((p) => canRead(id, p))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   };
+  const postById = new Map(state.posts.map((p) => [p.id, p]));
+  let index = new Map<string, Set<string>>();
+  function indexPost(post: Post) {
+    postById.set(post.id, post);
+    for (const word of searchableWords(post, state)) {
+      if (!index.has(word)) index.set(word, new Set());
+      index.get(word)!.add(post.id);
+    }
+  }
+  function rebuildIndex() {
+    index = new Map();
+    state.posts.forEach(indexPost);
+  }
+  rebuildIndex();
+  function candidates(id: string, query: string) {
+    user(id);
+    const first = searchWords(query)[0];
+    const ids = first ? [...(index.get(first) ?? [])] : [...postById.keys()];
+    return ids.map((id) => postById.get(id)!).filter((p) => canRead(id, p));
+  }
+  function matches(p: Post, id: string, query: string, scope: string) {
+    const words = new Set(searchableWords(p, state));
+    return (
+      inSearchScope(p, id, scope) &&
+      searchWords(query).every((w) => words.has(w))
+    );
+  }
   const tonesList = ["sage", "peach", "lavender", "blue", "sand"] as const;
   const goalIcons = [
     "run",
@@ -248,7 +282,9 @@ export function createService(
         outdatedBy: [],
         comments: [],
       };
+      p.searchTokens = postSearchTokens(p);
       state.posts.push(p);
+      indexPost(p);
       return commit(p);
     },
     createGroup(id: string, input: Partial<Group>) {
@@ -288,30 +324,21 @@ export function createService(
       return commit(g);
     },
     search(id: string, query: string, scope = "all") {
-      const words = query
-        .trim()
-        .toLowerCase()
-        .replace(/#/g, "")
-        .split(/\s+/)
-        .filter(Boolean);
       return structuredClone(
-        visiblePosts(id).filter((p) => {
-          if ((scope === "groups" || scope === "circles") && p.audienceType !== "group") return false;
-          if (
-            scope === "personal" &&
-            !(p.audienceType === "self" && p.authorId === id)
-          )
-            return false;
-          if (scope === "people" && p.audienceType !== "user") return false;
-          if (scope === "saved" && !p.savedBy.includes(id)) return false;
-          const author = user(p.authorId);
-          const circle =
-            p.audienceType === "group" ? group(p.audienceId).name : "";
-          const haystack =
-            `${p.title} ${p.body} ${p.tags.join(" ")} ${p.url ?? ""} ${author.name} ${author.handle} ${circle}`.toLowerCase();
-          return words.every((word) => haystack.includes(word));
-        }),
+        candidates(id, query)
+          .filter((p) => matches(p, id, query, scope))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       );
+    },
+    searchPage(id: string, query: string, scope = "all", cursor = "") {
+      const page = candidates(id, query)
+        .filter((p) => p.id > cursor)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+        .slice(0, SEARCH_PAGE_SIZE);
+      return structuredClone({
+        posts: page.filter((p) => matches(p, id, query, scope)),
+        nextCursor: page.length === SEARCH_PAGE_SIZE ? page.at(-1)!.id : null,
+      });
     },
     toggleSave(id: string, postId: string) {
       const p = readablePost(id, postId);
@@ -513,6 +540,7 @@ export function createService(
       const u = user(id);
       u.name = text(input.name, "Name", 60);
       u.bio = text(input.bio ?? "", "Bio", 240, false);
+      rebuildIndex();
       return commit(publicUser(u));
     },
   };

@@ -94,7 +94,8 @@ test("registration, login, access checks, search and logout work through HTTP", 
     );
     assert.equal(post.status, 201);
     assert.equal(
-      (await app.call("/search?q=secret", "GET", undefined, bt)).data.length,
+      (await app.call("/search?q=secret", "GET", undefined, bt)).data.posts
+        .length,
       0,
     );
     assert.equal(
@@ -512,7 +513,7 @@ test("comments, saves and useful votes persist across SQLite restart and stay sc
           undefined,
           bob.token,
         )
-      ).data.length,
+      ).data.posts.length,
       1,
     );
     assert.deepEqual(
@@ -533,8 +534,57 @@ test("comments, saves and useful votes persist across SQLite restart and stay sc
           undefined,
           bob.token,
         )
-      ).data,
+      ).data.posts,
       [],
+    );
+  } finally {
+    await app.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("search API returns a bounded page and a continuation cursor across a SQLite restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rabbit-search-"));
+  const path = join(dir, "test.sqlite");
+  let app = await start(path);
+  try {
+    const { data: alice } = await app.call(
+      "/auth/register",
+      "POST",
+      account("SearchAlice"),
+    );
+    for (let i = 0; i < 28; i++)
+      assert.equal(
+        (
+          await app.call(
+            "/posts",
+            "POST",
+            { audienceType: "self", title: `Orchid ${i}`, body: "Field guide" },
+            alice.token,
+          )
+        ).status,
+        201,
+      );
+    const first = (
+      await app.call("/search?q=orchid", "GET", undefined, alice.token)
+    ).data;
+    assert.equal(first.posts.length, 25);
+    assert.ok(first.nextCursor);
+    await app.stop();
+    app = await start(path);
+    const second = (
+      await app.call(
+        `/search?q=orchid&cursor=${first.nextCursor}`,
+        "GET",
+        undefined,
+        alice.token,
+      )
+    ).data;
+    assert.equal(second.posts.length, 3);
+    assert.equal(second.nextCursor, null);
+    assert.equal(
+      new Set([...first.posts, ...second.posts].map((p) => p.id)).size,
+      28,
     );
   } finally {
     await app.stop();

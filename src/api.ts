@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
-import type { Bootstrap, Post } from "./types";
+import type { Bootstrap, SearchPage } from "./types";
 import { firebaseAuth, firebaseService } from "./firebase";
 export { firebaseEnabled } from "./firebase";
 const nativeHost = Constants.expoConfig?.hostUri?.split(":")[0] ?? "localhost";
@@ -60,7 +60,7 @@ export async function request<T = unknown>(
   return result as T;
 }
 export const loadSpace = () => request<Bootstrap>("/bootstrap");
-export const searchPosts = (query: string, scope: string) =>
-  request<Post[]>(
-    `/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}`,
+export const searchPosts = (query: string, scope: string, cursor?: string) =>
+  request<SearchPage>(
+    `/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
   );

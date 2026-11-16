@@ -111,13 +111,16 @@ service cloud.firestore {
     }
     function validPost(post, postId) {
       return post.keys().hasAll(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'createdAt', 'votes', 'savedBy', 'comments'])
-        && post.keys().hasOnly(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'url', 'createdAt', 'votes', 'savedBy', 'comments', 'outdatedBy'])
+        && post.keys().hasOnly(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'url', 'createdAt', 'votes', 'savedBy', 'comments', 'outdatedBy', 'searchTokens'])
         && post.id == postId && text(post.title, 180) && post.title.size() > 0
         && text(post.body, 20000) && post.tags is list && post.tags.size() <= 6
         && post.type in ['note', 'link', 'question'] && text(post.createdAt, 40)
         && (post.type != 'link' || (text(post.url, 2000) && post.url.matches('https?://.*')))
         && post.votes is list && post.savedBy is list && post.comments is list
-        && post.get('outdatedBy', []) is list;
+        && post.get('outdatedBy', []) is list
+        && post.get('searchTokens', []) is list
+        && post.get('searchTokens', []).size() <= 12000
+        && post.get('searchTokens', []).toSet().size() == post.get('searchTokens', []).size();
     }
     function ownToggle(previous, next) {
       return next is list && next.toSet().size() == next.size()
