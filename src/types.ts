@@ -86,6 +86,7 @@ export type TaskInput = Partial<
 >;
 export type GoalsOverview = { goals: Goal[]; tasks: GoalTask[] };
 export type State = {
+  agentAccounts?: import("./agent-types").AgentAccount[];
   users: User[];
   groups: Group[];
   posts: Post[];

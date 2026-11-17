@@ -12,12 +12,14 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "babel-preset-expo": "~58.0.0",
     "expo": "~58.0.21",
+    "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.14",
     "expo-font": "~58.0.11",
     "expo-secure-store": "~58.0.2",
     "expo-speech-recognition": "^58.0.1",
     "expo-status-bar": "~58.0.4",
     "firebase": "^13.1.0",
+    "firebase-admin": "^14.5.1",
     "lucide-react-native": "^1.65.0",
     "react": "19.3.0",
     "react-aria": "^3.53.1",
@@ -60,7 +62,7 @@
     "serve": "SERVE_WEB=1 node server/index.ts",
     "preview:web": "npm run build:web && SERVE_WEB=1 PORT=4173 DB_PATH=data/preview.sqlite node server/index.ts",
     "format": "prettier --write App.tsx src server tests scripts *.json *.js *.css *.ts",
-    "test:rules": "firebase emulators:exec --config firebase.emulators.json --project demo-rabbit-friends --only auth,firestore \"node --test tests/firebase-friends.test.ts tests/firebase-goals.test.ts\""
+    "test:rules": "firebase emulators:exec --config firebase.emulators.json --project demo-rabbit-friends --only auth,firestore \"node --test tests/firebase-friends.test.ts tests/firebase-goals.test.ts tests/firebase-agents.test.ts\""
   },
   "private": true,
   "engines": {

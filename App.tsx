@@ -61,6 +61,7 @@ import {
 } from "./src/ui";
 import { Composer } from "./src/Composer";
 import { PostCard, PostDetail } from "./src/Posts";
+import { Agents } from "./src/Agents";
 import { Friends } from "./src/Friends";
 import { Circles, GroupForm } from "./src/Groups";
 import { Auth } from "./src/Auth";
@@ -1223,135 +1224,140 @@ function Rabbit() {
                       )}
                       {tab === "profile" && (
                         <>
-                          {profileMode !== "friends" && (
-                            <View
-                              style={[
-                                s.card,
-                                { padding: desktop ? 28 : 22, gap: 20 },
-                              ]}
-                            >
+                          {profileMode !== "friends" &&
+                            profileMode !== "agents" && (
                               <View
                                 style={[
-                                  s.between,
-                                  { gap: 12, flexWrap: "wrap" },
+                                  s.card,
+                                  { padding: desktop ? 28 : 22, gap: 20 },
                                 ]}
                               >
+                                <View
+                                  style={[
+                                    s.between,
+                                    { gap: 12, flexWrap: "wrap" },
+                                  ]}
+                                >
+                                  <View
+                                    style={[
+                                      s.row,
+                                      {
+                                        gap: 16,
+                                        flex: 1,
+                                        minWidth: desktop ? 0 : "100%",
+                                      },
+                                    ]}
+                                  >
+                                    <Avatar user={user} size={64} />
+                                    <View
+                                      style={{ gap: 4, flex: 1, minWidth: 0 }}
+                                    >
+                                      <Text style={[s.h2, { fontSize: 23 }]}>
+                                        {user.name}
+                                      </Text>
+                                      <Text style={s.small}>
+                                        @{user.handle}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {!editing && (
+                                    <Action
+                                      label="Edit profile"
+                                      secondary
+                                      style={{ minHeight: 48 }}
+                                      onPress={() => {
+                                        setProfileName(user.name);
+                                        setBio(user.bio ?? "");
+                                        setEditing(true);
+                                      }}
+                                    >
+                                      Edit profile
+                                    </Action>
+                                  )}
+                                </View>
+                                {editing ? (
+                                  <View style={{ gap: 18 }}>
+                                    <Field
+                                      label="Your name"
+                                      accessibilityLabel="Your name"
+                                      value={profileName}
+                                      onChangeText={setProfileName}
+                                      maxLength={60}
+                                    />
+                                    <Field
+                                      label="A little about you"
+                                      accessibilityLabel="Your bio"
+                                      value={bio}
+                                      onChangeText={setBio}
+                                      maxLength={240}
+                                    />
+                                    {!!profileError && (
+                                      <Text style={s.error}>
+                                        {profileError}
+                                      </Text>
+                                    )}
+                                    <View
+                                      style={[
+                                        s.row,
+                                        { gap: 10, justifyContent: "flex-end" },
+                                      ]}
+                                    >
+                                      <Action
+                                        secondary
+                                        onPress={() => setEditing(false)}
+                                      >
+                                        Cancel
+                                      </Action>
+                                      <Action
+                                        label="Save profile"
+                                        onPress={saveProfile}
+                                        loading={profileBusy}
+                                        disabled={!profileName.trim()}
+                                      >
+                                        Save profile
+                                      </Action>
+                                    </View>
+                                  </View>
+                                ) : (
+                                  <Text style={[s.text, { color: c.muted }]}>
+                                    {user.bio ||
+                                      "A little more curious every day. Add a bio to make this corner yours."}
+                                  </Text>
+                                )}
                                 <View
                                   style={[
                                     s.row,
                                     {
                                       gap: 16,
-                                      flex: 1,
-                                      minWidth: desktop ? 0 : "100%",
+                                      flexWrap: "wrap",
+                                      paddingTop: 17,
+                                      borderTopWidth: 1,
+                                      borderColor: c.border,
                                     },
                                   ]}
                                 >
-                                  <Avatar user={user} size={64} />
-                                  <View
-                                    style={{ gap: 4, flex: 1, minWidth: 0 }}
-                                  >
-                                    <Text style={[s.h2, { fontSize: 23 }]}>
-                                      {user.name}
-                                    </Text>
-                                    <Text style={s.small}>@{user.handle}</Text>
-                                  </View>
+                                  <Text style={s.small}>
+                                    {
+                                      data.posts.filter(
+                                        (p) => p.authorId === user.id,
+                                      ).length
+                                    }{" "}
+                                    thoughts shared
+                                  </Text>
+                                  <Text style={s.small}>
+                                    {data.groups.length} circles
+                                  </Text>
+                                  <Text style={s.small}>
+                                    {
+                                      data.posts.filter((p) =>
+                                        p.savedBy.includes(user.id),
+                                      ).length
+                                    }{" "}
+                                    saved for later
+                                  </Text>
                                 </View>
-                                {!editing && (
-                                  <Action
-                                    label="Edit profile"
-                                    secondary
-                                    style={{ minHeight: 48 }}
-                                    onPress={() => {
-                                      setProfileName(user.name);
-                                      setBio(user.bio ?? "");
-                                      setEditing(true);
-                                    }}
-                                  >
-                                    Edit profile
-                                  </Action>
-                                )}
                               </View>
-                              {editing ? (
-                                <View style={{ gap: 18 }}>
-                                  <Field
-                                    label="Your name"
-                                    accessibilityLabel="Your name"
-                                    value={profileName}
-                                    onChangeText={setProfileName}
-                                    maxLength={60}
-                                  />
-                                  <Field
-                                    label="A little about you"
-                                    accessibilityLabel="Your bio"
-                                    value={bio}
-                                    onChangeText={setBio}
-                                    maxLength={240}
-                                  />
-                                  {!!profileError && (
-                                    <Text style={s.error}>{profileError}</Text>
-                                  )}
-                                  <View
-                                    style={[
-                                      s.row,
-                                      { gap: 10, justifyContent: "flex-end" },
-                                    ]}
-                                  >
-                                    <Action
-                                      secondary
-                                      onPress={() => setEditing(false)}
-                                    >
-                                      Cancel
-                                    </Action>
-                                    <Action
-                                      label="Save profile"
-                                      onPress={saveProfile}
-                                      loading={profileBusy}
-                                      disabled={!profileName.trim()}
-                                    >
-                                      Save profile
-                                    </Action>
-                                  </View>
-                                </View>
-                              ) : (
-                                <Text style={[s.text, { color: c.muted }]}>
-                                  {user.bio ||
-                                    "A little more curious every day. Add a bio to make this corner yours."}
-                                </Text>
-                              )}
-                              <View
-                                style={[
-                                  s.row,
-                                  {
-                                    gap: 16,
-                                    flexWrap: "wrap",
-                                    paddingTop: 17,
-                                    borderTopWidth: 1,
-                                    borderColor: c.border,
-                                  },
-                                ]}
-                              >
-                                <Text style={s.small}>
-                                  {
-                                    data.posts.filter(
-                                      (p) => p.authorId === user.id,
-                                    ).length
-                                  }{" "}
-                                  thoughts shared
-                                </Text>
-                                <Text style={s.small}>
-                                  {data.groups.length} circles
-                                </Text>
-                                <Text style={s.small}>
-                                  {
-                                    data.posts.filter((p) =>
-                                      p.savedBy.includes(user.id),
-                                    ).length
-                                  }{" "}
-                                  saved for later
-                                </Text>
-                              </View>
-                            </View>
-                          )}
+                            )}
                           <View
                             style={[s.between, { gap: 8, flexWrap: "wrap" }]}
                           >
@@ -1362,7 +1368,8 @@ function Rabbit() {
                                   gap: 7,
                                   flexWrap: "wrap",
                                   flexGrow: 1,
-                                  flexShrink: 0,
+                                  flexShrink: 1,
+                                  maxWidth: "100%",
                                 },
                               ]}
                             >
@@ -1392,6 +1399,13 @@ function Rabbit() {
                                 style={{ minHeight: 48 }}
                               >
                                 Friends
+                              </Chip>
+                              <Chip
+                                active={profileMode === "agents"}
+                                onPress={() => setProfileMode("agents")}
+                                style={{ minHeight: 48 }}
+                              >
+                                Agents
                               </Chip>
                             </View>
                             <Pressable
@@ -1435,7 +1449,9 @@ function Rabbit() {
                               </Text>
                             </Pressable>
                           </View>
-                          {profileMode === "friends" ? (
+                          {profileMode === "agents" ? (
+                            <Agents key={user.id} />
+                          ) : profileMode === "friends" ? (
                             <Friends
                               key={user.id}
                               data={data}

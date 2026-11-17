@@ -4,7 +4,8 @@ import { createApi } from "./api.ts";
 const dbPath = process.env.DB_PATH ?? "data/rabbit.sqlite";
 mkdirSync(dirname(dbPath), { recursive: true });
 const app = createApi({
-  dbPath,
+  dbPath: process.env.RABBIT_AGENT_BACKEND === "firebase" ? ":memory:" : dbPath,
+  firebaseAgents: process.env.RABBIT_AGENT_BACKEND === "firebase",
   staticDir: process.env.SERVE_WEB === "1" ? "dist" : undefined,
 });
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 3001);

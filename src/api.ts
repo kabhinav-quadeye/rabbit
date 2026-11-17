@@ -5,7 +5,7 @@ import type { Bootstrap, Post } from "./types";
 import { firebaseAuth, firebaseService } from "./firebase";
 export { firebaseEnabled } from "./firebase";
 const nativeHost = Constants.expoConfig?.hostUri?.split(":")[0] ?? "localhost";
-const base =
+export const apiBase =
   process.env.EXPO_PUBLIC_API_URL ??
   (Platform.OS === "web" ? "" : `http://${nativeHost}:3001`);
 let token: string | null = null;
@@ -36,14 +36,19 @@ export async function request<T = unknown>(
   method = "GET",
   input?: unknown,
 ): Promise<T> {
-  if (firebaseService) return firebaseService.request<T>(path, method, input);
+  const gateway = /^\/agents(?:\/|$)/.test(path);
+  if (firebaseService && !gateway)
+    return firebaseService.request<T>(path, method, input);
+  const credential = firebaseAuth
+    ? await firebaseAuth.currentUser?.getIdToken()
+    : token;
   let response: Response;
   try {
-    response = await fetch(`${base}/api${path}`, {
+    response = await fetch(`${apiBase}/api${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
       },
       body: input === undefined ? undefined : JSON.stringify(input),
     });

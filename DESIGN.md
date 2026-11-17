@@ -260,6 +260,14 @@ The composer's audience button is a (36px) minimum-height chip with a (240px) ma
 
 This three-part signature is specific to the composer. Existing post metadata badges use a smaller lock badge and are not claimed to implement the same glyph-switching behavior.
 
+### Agents
+
+Profile → Agents keeps token setup, connections, proposed drafts and recent activity in the existing reading column. Setup and draft review use paper cards, forest primary actions and DM Sans; compact supporting text explains permissions and privacy. Actions have a 48px minimum height and wrap on phones. Profile filters wrap within the content width.
+
+New tokens are masked until revealed, copyable once, and cleared when leaving the tab. The setup explanation states that tokens are credentials and expire after 30 days. Existing connections show their name and expiry, with an inline confirmation before deletion. Drafts open an inline editor; the only publication action is “Publish privately,” paired with “Only you will see the published note.” Failed actions retain input and provide retry feedback. Activity uses a flat chronological list with the agent name and time, with daily read summaries and individual write entries.
+
+Evidence: responsive web review at 360px and 1440px; native appearance and behavior remain unverified.
+
 ### Goals
 
 Goals reuse the circle vocabulary rather than adding a new one. The nav glyph is Lucide `Sprout`.

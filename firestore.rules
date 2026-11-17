@@ -155,6 +155,10 @@ service cloud.firestore {
             && newComment(resource.data.comments, request.resource.data.comments)));
       allow delete: if signedIn() && resource.data.authorId == me();
     }
+    // Agent credentials, draft review and audit mutations require the trusted gateway.
+    match /agentAccounts/{uid} {
+      allow read, write: if false;
+    }
     // Goals are private to their owner. Domain code keeps the cascade
     // invariant (a done task has no open descendants); rules enforce privacy,
     // structure and immutable fields.
