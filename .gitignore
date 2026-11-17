@@ -48,3 +48,4 @@ yarn-error.*
 /playwright-report/
 /.impeccable/review/
 /dist-native/
+.gstack/

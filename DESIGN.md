@@ -272,7 +272,9 @@ Goals reuse the circle vocabulary rather than adding a new one. The nav glyph is
 - **Task detail placement:** below (960px), a bottom sheet with a grab handle and top-only dialog radius (`Sheet placement="bottom"`); from (960px) to (1229px), a right-anchored sheet (`placement="side"`); at (1230px) and above, an inline (360px) paper panel in place of the support column, so the tree stays visible.
 - **Phone quick add:** a white bar with a top border, docked above the bottom navigation on a goal page, with a (44px) forest send button.
 
-Evidence: responsive web captures at 390px and 1440px from the goals browser suite. Native appearance is not verified.
+- **Sharing:** a goal page shows its audience under the header, with the icon and words changing together: a lock with “Only you can see this goal”, or overlapping member avatars with “Shared with Sam and 2 others”. It opens the “People in this goal” sheet, which lists members (owner tagged), offers Leave or Remove where allowed, and repeats the circle friend picker (avatar rows, pale-foliage selection, check). The create form offers the same picker as an optional section. Goal cards repeat the avatar line for shared goals, and goals someone else owns say “{Name}’s goal”. Tasks finished by someone else carry a quiet “Done by {Name}” meta line.
+
+Evidence: responsive web captures at 390px and 1440px from the goals and goal sharing browser suites. Native appearance is not verified.
 
 ## Do's and Don'ts
 

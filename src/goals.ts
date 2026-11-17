@@ -10,6 +10,13 @@ export const priorityRank: Record<Priority, number> = {
 export const MAX_DEPTH = 3; // four visible levels: depth 0–3
 export const HOME_LIMIT = 3;
 
+/** Everyone in a goal, owner first. Legacy goals have only their owner. */
+export const goalMembers = (goal: Goal) => goal.memberIds ?? [goal.ownerId];
+export const isGoalMember = (goal: Goal, userId: string) =>
+  goal.ownerId === userId || goalMembers(goal).includes(userId);
+/** Who completed a task; tasks done before sharing count for the goal owner. */
+export const completer = (t: GoalTask) => t.completedBy ?? t.ownerId;
+
 const byCreation = (a: GoalTask, b: GoalTask) =>
   a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
@@ -97,8 +104,11 @@ export const parseDate = (value: string) => {
 export const addDays = (d: Date, days: number) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
 
-/** Completed work in the last 7 local days (today included) and the 7 before. */
-export function momentum(tasks: GoalTask[], now: Date) {
+/**
+ * Completed work in the last 7 local days (today included) and the 7 before.
+ * With a userId, only that person's completions count.
+ */
+export function momentum(tasks: GoalTask[], now: Date, userId?: string) {
   const start = addDays(now, -6),
     previousStart = addDays(now, -13);
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -110,6 +120,7 @@ export function momentum(tasks: GoalTask[], now: Date) {
     previous = 0;
   for (const t of tasks) {
     if (t.status !== "done" || !t.completedAt) continue;
+    if (userId && completer(t) !== userId) continue;
     const when = new Date(t.completedAt);
     if (when >= start && when <= now) {
       completed++;

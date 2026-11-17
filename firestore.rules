@@ -155,35 +155,59 @@ service cloud.firestore {
             && newComment(resource.data.comments, request.resource.data.comments)));
       allow delete: if signedIn() && resource.data.authorId == me();
     }
-    // Goals are private to their owner. Domain code keeps the cascade
-    // invariant (a done task has no open descendants); rules enforce privacy,
-    // structure and immutable fields.
+    // Goals are private to their members: the owner plus anyone they share
+    // with. Goals from before sharing have no memberIds and belong to their
+    // owner alone. Members work on tasks; only the owner changes settings.
+    // Domain code keeps the cascade invariant (a done task has no open
+    // descendants); rules enforce privacy, structure and immutable fields.
     function calendarDate(value) {
       return value == null || (value is string && value.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'));
     }
     function stamp(value) { return value is string && value.size() > 0 && value.size() <= 40; }
+    function goalMemberIds(g) { return g.get('memberIds', [g.ownerId]); }
+    function inGoal(g) { return g.ownerId == me() || me() in g.get('memberIds', []); }
+    function goalOf(goalId) { return get(/databases/$(database)/documents/goals/$(goalId)).data; }
     function validGoal(g, goalId) {
       return g.keys().hasAll(['id', 'ownerId', 'title', 'why', 'color', 'icon', 'targetDate', 'status', 'createdAt', 'updatedAt', 'reachedAt'])
-        && g.keys().hasOnly(['id', 'ownerId', 'title', 'why', 'color', 'icon', 'targetDate', 'status', 'createdAt', 'updatedAt', 'reachedAt'])
+        && g.keys().hasOnly(['id', 'ownerId', 'title', 'why', 'color', 'icon', 'targetDate', 'status', 'createdAt', 'updatedAt', 'reachedAt', 'memberIds'])
+        && (!('memberIds' in g) || (g.memberIds is list && g.memberIds.size() > 0
+          && g.memberIds.size() <= 50 && g.memberIds.toSet().size() == g.memberIds.size()
+          && g.ownerId in g.memberIds))
         && g.id == goalId && text(g.title, 120) && g.title.size() > 0 && text(g.why, 500)
         && g.color in ['sage', 'peach', 'lavender', 'blue', 'sand']
         && g.icon in ['run', 'book', 'leaf', 'language', 'flag', 'heart']
         && calendarDate(g.targetDate) && g.status in ['active', 'reached', 'archived']
         && stamp(g.createdAt) && stamp(g.updatedAt) && (g.reachedAt == null || stamp(g.reachedAt));
     }
-    match /goals/{goalId} {
-      allow read: if signedIn() && resource.data.ownerId == me();
-      allow create: if signedIn() && request.resource.data.ownerId == me()
-        && validGoal(request.resource.data, goalId);
-      allow update: if signedIn() && resource.data.ownerId == me()
-        && validGoal(request.resource.data, goalId)
+    function goalSettingsEdit() {
+      return resource.data.ownerId == me()
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['title', 'why', 'color', 'icon', 'targetDate', 'status', 'updatedAt', 'reachedAt']);
+    }
+    // Members invite their own accepted friends, as in circles. The owner can
+    // remove anyone except themself; any other member can leave.
+    function goalMembersEdit() {
+      let before = goalMemberIds(resource.data);
+      let after = request.resource.data.memberIds;
+      return inGoal(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+        && ((after.hasAll(before) && onlyFriends(after.toSet().difference(before.toSet())))
+          || (before.hasAll(after) && (resource.data.ownerId == me()
+            || before.toSet().difference(after.toSet()) == [me()].toSet())));
+    }
+    match /goals/{goalId} {
+      allow read: if signedIn() && inGoal(resource.data);
+      allow create: if signedIn() && request.resource.data.ownerId == me()
+        && validGoal(request.resource.data, goalId)
+        && onlyFriends(goalMemberIds(request.resource.data).toSet());
+      allow update: if signedIn() && validGoal(request.resource.data, goalId)
+        && (goalSettingsEdit() || goalMembersEdit());
       allow delete: if signedIn() && resource.data.ownerId == me();
     }
     function validTask(t, taskId) {
       return t.keys().hasAll(['id', 'ownerId', 'goalId', 'parentId', 'depth', 'description', 'notes', 'priority', 'dueDate', 'status', 'createdAt', 'updatedAt', 'completedAt'])
-        && t.keys().hasOnly(['id', 'ownerId', 'goalId', 'parentId', 'depth', 'description', 'notes', 'priority', 'dueDate', 'status', 'createdAt', 'updatedAt', 'completedAt'])
+        && t.keys().hasOnly(['id', 'ownerId', 'goalId', 'parentId', 'depth', 'description', 'notes', 'priority', 'dueDate', 'status', 'createdAt', 'updatedAt', 'completedAt', 'completedBy'])
+        && (t.get('completedBy', null) == null || t.completedBy is string)
         && t.id == taskId && t.goalId is string && (t.parentId == null || t.parentId is string)
         && t.depth is int && t.depth >= 0 && t.depth <= 3
         && text(t.description, 500) && t.description.size() > 0 && text(t.notes, 10000)
@@ -193,22 +217,36 @@ service cloud.firestore {
     }
     function validParent(t) {
       let parent = getAfter(/databases/$(database)/documents/goalTasks/$(t.parentId)).data;
-      return parent.ownerId == me() && parent.goalId == t.goalId && t.depth == parent.depth + 1;
+      return parent.ownerId == t.ownerId && parent.goalId == t.goalId && t.depth == parent.depth + 1;
+    }
+    // Tasks carry the goal owner's id whoever adds them, so the owner's single
+    // ownerId query loads every task, and members reach tasks through the goal.
+    function taskMember(t) { return t.ownerId == me() || inGoal(goalOf(t.goalId)); }
+    function newTaskInGoal(t) {
+      let g = goalOf(t.goalId);
+      return inGoal(g) && t.ownerId == g.ownerId;
+    }
+    // Only the person completing a task can record themself as its completer.
+    function validCompleter(before, after) {
+      return after.get('completedBy', null) == null
+        || after.completedBy == before.get('completedBy', null)
+        || after.completedBy == me();
     }
     match /goalTasks/{taskId} {
-      allow read: if signedIn() && resource.data.ownerId == me();
-      allow create: if signedIn() && request.resource.data.ownerId == me()
-        && validTask(request.resource.data, taskId)
+      allow read: if signedIn() && taskMember(resource.data);
+      allow create: if signedIn() && validTask(request.resource.data, taskId)
         && request.resource.data.status == 'open'
-        && get(/databases/$(database)/documents/goals/$(request.resource.data.goalId)).data.ownerId == me()
+        && request.resource.data.get('completedBy', null) == null
+        && newTaskInGoal(request.resource.data)
         && (request.resource.data.parentId == null
           ? request.resource.data.depth == 0
           : validParent(request.resource.data));
-      allow update: if signedIn() && resource.data.ownerId == me()
+      allow update: if signedIn() && taskMember(resource.data)
         && validTask(request.resource.data, taskId)
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['description', 'notes', 'priority', 'dueDate', 'status', 'updatedAt', 'completedAt']);
-      allow delete: if signedIn() && resource.data.ownerId == me();
+          .hasOnly(['description', 'notes', 'priority', 'dueDate', 'status', 'updatedAt', 'completedAt', 'completedBy'])
+        && validCompleter(resource.data, request.resource.data);
+      allow delete: if signedIn() && taskMember(resource.data);
     }
   }
 }

@@ -59,6 +59,11 @@ export type Goal = {
   createdAt: string;
   updatedAt: string;
   reachedAt: string | null;
+  /**
+   * Everyone who can see and work on the goal, owner included. Goals created
+   * before sharing existed have no list and belong to their owner alone.
+   */
+  memberIds?: string[];
 };
 export type Priority = "none" | "low" | "medium" | "high";
 export type GoalTask = {
@@ -77,9 +82,14 @@ export type GoalTask = {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  /** Who completed the task; absent on tasks completed before sharing. */
+  completedBy?: string | null;
 };
 export type GoalInput = Partial<
-  Pick<Goal, "title" | "why" | "color" | "icon" | "targetDate" | "status">
+  Pick<
+    Goal,
+    "title" | "why" | "color" | "icon" | "targetDate" | "status" | "memberIds"
+  >
 >;
 export type TaskInput = Partial<
   Pick<GoalTask, "description" | "notes" | "priority" | "dueDate" | "parentId">

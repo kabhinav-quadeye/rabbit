@@ -39,7 +39,14 @@ import {
   formatDate,
 } from "./goals";
 import { useGoals, type GoalsApi } from "./useGoals";
-import type { Goal, GoalTask } from "./types";
+import {
+  GoalPeopleSheet,
+  SharedWith,
+  peopleOf,
+  personName,
+  type GoalPeople,
+} from "./GoalPeople";
+import type { Bootstrap, Goal, GoalTask } from "./types";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -121,6 +128,7 @@ function Momentum({ stats }: { stats: NonNullable<GoalsApi["stats"]> }) {
 function GoalCard({
   goal,
   api,
+  people,
   rowError,
   onOpen,
   onToggle,
@@ -128,6 +136,7 @@ function GoalCard({
 }: {
   goal: Goal;
   api: GoalsApi;
+  people: GoalPeople;
   rowError: Record<string, string>;
   onOpen: () => void;
   onToggle: (t: GoalTask) => void;
@@ -171,10 +180,18 @@ function GoalCard({
           <Text style={s.small}>
             {progress.done} of {progress.total} done
             {target ? ` · ${target}` : ""}
+            {goal.ownerId !== people.me
+              ? ` · ${personName(people, goal.ownerId)}’s goal`
+              : ""}
           </Text>
         </View>
         <ChevronRight size={18} color={c.faint} />
       </Pressable>
+      {(goal.memberIds?.length ?? 1) > 1 && (
+        <View style={{ marginTop: 6 }}>
+          <SharedWith goal={goal} people={people} ring={c.paper} />
+        </View>
+      )}
       <View style={[s.row, { marginTop: 12, marginBottom: 4 }]}>
         <ProgressBar done={progress.done} total={progress.total} />
       </View>
@@ -359,15 +376,20 @@ function SectionToggle({
 }
 
 export function GoalsScreen({
+  space,
   desktop,
   wide,
   onToast,
+  onFindFriends,
 }: {
+  space: Bootstrap;
   desktop: boolean;
   wide: boolean;
   onToast: (message: string) => void;
+  onFindFriends: () => void;
 }) {
-  const api = useGoals();
+  const people = peopleOf(space);
+  const api = useGoals(people.me);
   const [goalId, setGoalId] = useState<string | null>(null),
     [taskId, setTaskId] = useState<string | null>(null),
     [form, setForm] = useState<true | Goal | false>(false),
@@ -379,12 +401,14 @@ export function GoalsScreen({
     }>(null),
     [rowError, setRowError] = useState<Record<string, string>>({}),
     [showReached, setShowReached] = useState(false),
-    [showArchived, setShowArchived] = useState(false);
+    [showArchived, setShowArchived] = useState(false),
+    [sharingId, setSharingId] = useState<string | null>(null);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const phone = !desktop;
   const data = api.data;
   const goal = data?.goals.find((g) => g.id === goalId) ?? null;
   const task = data?.tasks.find((t) => t.id === taskId) ?? null;
+  const sharingGoal = data?.goals.find((g) => g.id === sharingId) ?? null;
   const taskGoal = task
     ? (data?.goals.find((g) => g.id === task.goalId) ?? null)
     : null;
@@ -439,8 +463,22 @@ export function GoalsScreen({
       },
     });
   }
+  async function leave(g: Goal) {
+    await api.removeMember(g.id, people.me);
+    setSharingId(null);
+    openGoal(null);
+    onToast(`You left ${g.title}.`);
+  }
   function goalMenu(g: Goal, action: GoalMenuAction) {
     if (action === "edit") return setForm(g);
+    if (action === "share") return setSharingId(g.id);
+    if (action === "leave")
+      return setConfirm({
+        title: "Leave this goal?",
+        body: `You’ll stop seeing “${g.title}” and its tasks. Tasks you added or completed stay with the goal.`,
+        label: "Leave goal",
+        run: () => leave(g),
+      });
     if (action === "delete")
       return setConfirm({
         title: "Delete this goal?",
@@ -636,6 +674,7 @@ export function GoalsScreen({
                 key={g.id}
                 goal={g}
                 api={api}
+                people={people}
                 rowError={rowError}
                 onOpen={() => openGoal(g.id)}
                 onToggle={toggle}
@@ -691,13 +730,19 @@ export function GoalsScreen({
                       <Text style={[s.label, { flex: 1, color: c.muted }]}>
                         {g.title}
                       </Text>
-                      <Action
-                        secondary
-                        onPress={() => goalMenu(g, "active")}
-                        style={{ minHeight: 36 }}
-                      >
-                        Restore
-                      </Action>
+                      {g.ownerId === people.me ? (
+                        <Action
+                          secondary
+                          onPress={() => goalMenu(g, "active")}
+                          style={{ minHeight: 36 }}
+                        >
+                          Restore
+                        </Action>
+                      ) : (
+                        <Text style={s.small}>
+                          {personName(people, g.ownerId)}’s goal
+                        </Text>
+                      )}
                     </View>
                   ))}
               </View>
@@ -761,6 +806,7 @@ export function GoalsScreen({
             <GoalPage
               goal={goal}
               api={api}
+              people={people}
               desktop={desktop}
               phone={phone}
               selectedId={taskId}
@@ -818,6 +864,11 @@ export function GoalsScreen({
       {!!form && (
         <GoalForm
           goal={form === true ? undefined : form}
+          people={people}
+          onFindFriends={() => {
+            setForm(false);
+            onFindFriends();
+          }}
           onClose={() => setForm(false)}
           onSave={async (input) => {
             if (form === true) {
@@ -828,6 +879,31 @@ export function GoalsScreen({
               await api.updateGoal(form.id, input);
               setForm(false);
             }
+          }}
+        />
+      )}
+      {sharingGoal && (
+        <GoalPeopleSheet
+          goal={sharingGoal}
+          people={people}
+          onClose={() => setSharingId(null)}
+          onShare={async (ids) => {
+            const g = await api.shareGoal(sharingGoal.id, ids);
+            onToast(
+              ids.length === 1
+                ? `Shared with ${personName(people, ids[0])}.`
+                : `Shared with ${ids.length} friends.`,
+            );
+            return g;
+          }}
+          onRemove={(id) =>
+            id === people.me
+              ? leave(sharingGoal)
+              : api.removeMember(sharingGoal.id, id)
+          }
+          onFindFriends={() => {
+            setSharingId(null);
+            onFindFriends();
           }}
         />
       )}

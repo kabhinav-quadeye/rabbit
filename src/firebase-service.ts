@@ -15,6 +15,7 @@ import {
   where,
   runTransaction,
   setDoc,
+  updateDoc,
   arrayUnion,
   arrayRemove,
   writeBatch,
@@ -155,8 +156,9 @@ export function createFirebaseService(
     space.currentUser.email = auth.currentUser!.email ?? undefined;
     return space;
   }
-  // Goals are private, so they load only the owner's documents and never the
-  // shared post state. The domain service validates; writes are atomic batches.
+  // Goals load only documents the person can see (their own goals and goals
+  // shared with them), never the shared post state. The domain service
+  // validates; task writes are atomic batches.
   /** goalId scopes tasks to one goal; null skips tasks; undefined loads all. */
   async function goalState(
     uid: string,
@@ -164,22 +166,93 @@ export function createFirebaseService(
   ): Promise<State> {
     const owned = (name: string) =>
       query(collection(db, name), where("ownerId", "==", uid));
-    const [goalDocs, taskDocs] = await Promise.all([
+    const [ownGoals, sharedGoals, one] = await Promise.all([
       getDocs(owned("goals")),
-      goalId === null
-        ? null
-        : getDocs(
-            goalId
-              ? query(owned("goalTasks"), where("goalId", "==", goalId))
-              : owned("goalTasks"),
-          ),
+      goalId === undefined
+        ? getDocs(
+            query(
+              collection(db, "goals"),
+              where("memberIds", "array-contains", uid),
+            ),
+          )
+        : null,
+      goalId ? readGoal(goalId) : null,
     ]);
+    const goals = [
+      ...new Map(
+        [
+          ...ownGoals.docs.map((d) => d.data() as Goal),
+          ...(sharedGoals?.docs.map((d) => d.data() as Goal) ?? []),
+          ...(one ? [one] : []),
+        ].map((g) => [g.id, g]),
+      ).values(),
+    ];
+    // The owner's tasks come from one query; tasks of goals shared with this
+    // person are read goal by goal, which the rules allow through membership.
+    const taskQueries =
+      goalId === null
+        ? []
+        : goalId
+          ? one
+            ? [
+                one.ownerId === uid
+                  ? query(owned("goalTasks"), where("goalId", "==", goalId))
+                  : query(
+                      collection(db, "goalTasks"),
+                      where("goalId", "==", goalId),
+                    ),
+              ]
+            : []
+          : [
+              owned("goalTasks"),
+              ...goals
+                .filter((g) => g.ownerId !== uid)
+                .map((g) =>
+                  query(
+                    collection(db, "goalTasks"),
+                    where("goalId", "==", g.id),
+                  ),
+                ),
+            ];
+    const taskDocs = await Promise.all(taskQueries.map((q) => getDocs(q)));
     return {
       users: [],
       groups: [],
       posts: [],
-      goals: goalDocs.docs.map((d) => d.data() as Goal),
-      goalTasks: taskDocs?.docs.map((d) => d.data() as GoalTask) ?? [],
+      goals,
+      goalTasks: taskDocs.flatMap((s) =>
+        s.docs.map((d) => d.data() as GoalTask),
+      ),
+    };
+  }
+  /** A goal the person can see, or undefined: missing and foreign look alike. */
+  async function readGoal(goalId: string) {
+    try {
+      return (await getDoc(doc(db, "goals", goalId))).data() as
+        Goal | undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  /** Users and the person's friend requests, for checking who they can invite. */
+  async function friendState(uid: string) {
+    const [users, sent, received] = await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(
+        query(collection(db, "friendRequests"), where("senderId", "==", uid)),
+      ),
+      getDocs(
+        query(
+          collection(db, "friendRequests"),
+          where("recipientId", "==", uid),
+        ),
+      ),
+    ]);
+    return {
+      users: users.docs.map((d) => d.data() as User),
+      friendRequests: [...sent.docs, ...received.docs].map(
+        (d) => d.data() as FriendRequest,
+      ),
     };
   }
   async function commitGoalWrites(
@@ -206,9 +279,47 @@ export function createFirebaseService(
     if (path === "/goals" && method === "GET")
       return service(await goalState(uid)).goalsOverview(uid);
     if (path === "/goals" && method === "POST") {
-      const goal = service(await goalState(uid, null)).createGoal(uid, input);
+      const sharing = Array.isArray(input?.memberIds) && input.memberIds.length;
+      const state = await goalState(uid, null);
+      const goal = service({
+        ...state,
+        ...(sharing ? await friendState(uid) : {}),
+      }).createGoal(uid, input);
       await commitGoalWrites([goal], "goals");
       return goal;
+    }
+    const memberMatch = path.match(/^\/goals\/([^/]+)\/members(?:\/([^/]+))?$/);
+    if (
+      memberMatch &&
+      (memberMatch[2] ? method === "DELETE" : method === "POST")
+    ) {
+      const ref = doc(db, "goals", memberMatch[1]);
+      const people = memberMatch[2] ? {} : await friendState(uid);
+      return runTransaction(db, async (tx) => {
+        let snapshot;
+        try {
+          snapshot = await tx.get(ref);
+        } catch {
+          snapshot = null; // Missing and foreign goals both read as not found.
+        }
+        if (!snapshot?.exists()) throw new Error("Goal not found.");
+        const app = service({
+          users: [],
+          groups: [],
+          posts: [],
+          ...people,
+          goals: [snapshot.data() as Goal],
+        });
+        const goal = memberMatch[2]
+          ? app.removeGoalMember(
+              uid,
+              snapshot.id,
+              decodeURIComponent(memberMatch[2]),
+            )
+          : app.shareGoal(uid, snapshot.id, input?.memberIds);
+        tx.update(ref, { memberIds: goal.memberIds });
+        return goal;
+      });
     }
     const goalMatch = path.match(/^\/goals\/([^/]+)(\/tasks)?$/);
     if (goalMatch) {
@@ -220,7 +331,27 @@ export function createFirebaseService(
       }
       if (!goalMatch[2] && method === "PATCH") {
         const goal = app.updateGoal(uid, goalMatch[1], input);
-        await commitGoalWrites([goal], "goals");
+        // Write only settings, so a concurrent invite is never overwritten.
+        const {
+          title,
+          why,
+          color,
+          icon,
+          targetDate,
+          status,
+          updatedAt,
+          reachedAt,
+        } = goal;
+        await updateDoc(doc(db, "goals", goal.id), {
+          title,
+          why,
+          color,
+          icon,
+          targetDate,
+          status,
+          updatedAt,
+          reachedAt,
+        });
         return goal;
       }
       if (!goalMatch[2] && method === "DELETE") {
@@ -396,7 +527,10 @@ export function createFirebaseService(
       );
     if (path === "/posts" && method === "POST") {
       const post = service.createPost(uid, input as PostInput);
-      await setDoc(doc(db, "posts", post.id), clean(post));
+      // Omit the empty outdatedBy list: it is optional in the rules, and
+      // writing it breaks post creation wherever older rules are deployed.
+      const { outdatedBy: _unmarked, ...stored } = post;
+      await setDoc(doc(db, "posts", post.id), clean(stored));
       return post;
     }
     if (path === "/groups" && method === "POST") {

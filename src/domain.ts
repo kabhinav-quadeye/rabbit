@@ -10,7 +10,13 @@ import type {
   GoalInput,
   TaskInput,
 } from "./types.ts";
-import { MAX_DEPTH, ancestors, descendants } from "./goals.ts";
+import {
+  MAX_DEPTH,
+  ancestors,
+  descendants,
+  goalMembers,
+  isGoalMember,
+} from "./goals.ts";
 
 export class AppError extends Error {
   status: number;
@@ -49,11 +55,12 @@ export function createService(
           r.status === "accepted" && [r.senderId, r.recipientId].includes(id),
       )
       .map((r) => (r.senderId === id ? r.recipientId : r.senderId));
-  const requireFriends = (id: string, ids: string[]) => {
+  const requireFriends = (id: string, ids: string[], place = "a circle") => {
     ids.forEach(user);
     if (ids.some((other) => other !== id && !friendIds(id).includes(other)))
-      fail("You can only add accepted friends to a circle.", 403);
+      fail(`You can only add accepted friends to ${place}.`, 403);
   };
+  const MAX_GOAL_MEMBERS = 50;
   const user = (id: string): User =>
     state.users.find((u) => u.id === id) ?? fail("User not found.", 404);
   const group = (id: string): Group =>
@@ -109,18 +116,35 @@ export function createService(
       return fail(`${label} must be a valid date.`);
     return value as string;
   };
-  const ownGoal = (id: string, goalId: string): Goal =>
-    goals.find((g) => g.id === goalId && g.ownerId === id) ??
+  // People outside a goal get 404s, so they never learn it exists. Members
+  // work on tasks together; only the owner changes the goal's settings.
+  const memberGoal = (id: string, goalId: string): Goal =>
+    goals.find((g) => g.id === goalId && isGoalMember(g, id)) ??
     fail("Goal not found.", 404);
-  const ownTask = (id: string, taskId: string): GoalTask =>
-    goalTasks.find((t) => t.id === taskId && t.ownerId === id) ??
-    fail("Task not found.", 404);
+  const ownGoal = (id: string, goalId: string, action: string): Goal => {
+    const g = memberGoal(id, goalId);
+    if (g.ownerId !== id)
+      fail(`Only the goal’s owner can ${action}.`, 403);
+    return g;
+  };
+  const memberTask = (id: string, taskId: string): GoalTask => {
+    const t = goalTasks.find((t) => t.id === taskId);
+    const g = t && goals.find((g) => g.id === t.goalId);
+    if (!t || !(g ? isGoalMember(g, id) : t.ownerId === id))
+      return fail("Task not found.", 404);
+    return t;
+  };
+  const memberList = (value: unknown) => {
+    if (!Array.isArray(value ?? [])) fail("Members must be a list.");
+    return [...new Set(((value as unknown[]) ?? []).map(String))];
+  };
   const reopen = (list: GoalTask[], stamp: string) =>
     list
       .filter((t) => t.status === "done")
       .map((t) => {
         t.status = "open";
         t.completedAt = null;
+        t.completedBy = null;
         t.updatedAt = stamp;
         return t;
       });
@@ -345,14 +369,27 @@ export function createService(
       });
       return commit(p);
     },
+    /** Every goal the person owns or was invited to, with all of its tasks. */
     goalsOverview(id: string) {
+      const visible = goals.filter((g) => isGoalMember(g, id));
+      const ids = new Set(visible.map((g) => g.id));
       return structuredClone({
-        goals: goals.filter((g) => g.ownerId === id),
-        tasks: goalTasks.filter((t) => t.ownerId === id),
+        goals: visible,
+        tasks: goalTasks.filter((t) => ids.has(t.goalId)),
       });
     },
     createGoal(id: string, input: GoalInput) {
       const title = text(input.title, "Goal title", 120);
+      const memberIds = [id, ...memberList(input.memberIds)].filter(
+        (x, i, all) => all.indexOf(x) === i,
+      );
+      requireFriends(
+        id,
+        memberIds.filter((x) => x !== id),
+        "a goal",
+      );
+      if (memberIds.length > MAX_GOAL_MEMBERS)
+        fail(`A goal can be shared with up to ${MAX_GOAL_MEMBERS} people.`);
       if (
         goals.filter((g) => g.ownerId === id && g.status !== "archived")
           .length >= 50
@@ -371,12 +408,13 @@ export function createService(
         createdAt: stamp,
         updatedAt: stamp,
         reachedAt: null,
+        memberIds,
       };
       goals.push(g);
       return commit(g);
     },
     updateGoal(id: string, goalId: string, input: GoalInput) {
-      const g = ownGoal(id, goalId);
+      const g = ownGoal(id, goalId, "change it");
       const next = { ...g };
       if (input.title !== undefined)
         next.title = text(input.title, "Goal title", 120);
@@ -412,8 +450,33 @@ export function createService(
       Object.assign(g, next);
       return commit(g);
     },
+    /** Any member can bring in their own accepted friends, as in circles. */
+    shareGoal(id: string, goalId: string, ids: string[]) {
+      const g = memberGoal(id, goalId);
+      const current = goalMembers(g);
+      const added = memberList(ids);
+      if (!added.length) fail("Choose at least one friend.");
+      const fresh = added.filter((other) => !current.includes(other));
+      requireFriends(id, fresh, "a goal");
+      if (current.length + fresh.length > MAX_GOAL_MEMBERS)
+        fail(`A goal can be shared with up to ${MAX_GOAL_MEMBERS} people.`);
+      g.memberIds = [...current, ...fresh];
+      return commit(g);
+    },
+    /** Members can leave; the owner can remove anyone but themself. */
+    removeGoalMember(id: string, goalId: string, memberId: string) {
+      const g = memberGoal(id, goalId);
+      if (memberId === g.ownerId)
+        fail("The owner can’t leave their own goal. Delete it instead.");
+      if (memberId !== id && g.ownerId !== id)
+        fail("Only the goal’s owner can remove people.", 403);
+      const current = goalMembers(g);
+      if (!current.includes(memberId)) fail("This person isn’t in the goal.", 404);
+      g.memberIds = current.filter((x) => x !== memberId);
+      return commit(g);
+    },
     deleteGoal(id: string, goalId: string) {
-      const g = ownGoal(id, goalId);
+      const g = ownGoal(id, goalId, "delete it");
       const taskIds = goalTasks
         .filter((t) => t.goalId === g.id)
         .map((t) => t.id);
@@ -424,7 +487,7 @@ export function createService(
     },
     /** Returns the new task first, followed by any done ancestors it reopened. */
     createTask(id: string, goalId: string, input: TaskInput) {
-      const g = ownGoal(id, goalId);
+      const g = memberGoal(id, goalId);
       const description = text(input.description, "Task description", 500);
       if (goalTasks.filter((t) => t.goalId === g.id).length >= 500)
         fail("A goal can hold up to 500 tasks.");
@@ -432,7 +495,7 @@ export function createService(
       if (!priorities.includes(priority)) fail("Choose a valid priority.");
       let parent: GoalTask | null = null;
       if (input.parentId) {
-        parent = ownTask(id, input.parentId);
+        parent = memberTask(id, input.parentId);
         if (parent.goalId !== g.id)
           fail("A sub-task must belong to the same goal as its parent.");
         if (parent.depth + 1 > MAX_DEPTH)
@@ -441,7 +504,8 @@ export function createService(
       const stamp = now().toISOString();
       const t: GoalTask = {
         id: randomUUID(),
-        ownerId: id,
+        // Tasks belong to the goal's owner, whoever adds them.
+        ownerId: g.ownerId,
         goalId: g.id,
         parentId: parent?.id ?? null,
         depth: parent ? parent.depth + 1 : 0,
@@ -461,7 +525,7 @@ export function createService(
       return commit([t, ...reopened]);
     },
     updateTask(id: string, taskId: string, input: TaskInput) {
-      const t = ownTask(id, taskId);
+      const t = memberTask(id, taskId);
       const next = { ...t };
       if (input.description !== undefined)
         next.description = text(input.description, "Task description", 500);
@@ -480,7 +544,7 @@ export function createService(
     },
     /** Completes a task; with cascade, also every open descendant. Returns changed tasks. */
     completeTask(id: string, taskId: string, cascade: boolean) {
-      const t = ownTask(id, taskId);
+      const t = memberTask(id, taskId);
       const open = descendants(goalTasks, t.id).filter(
         (x) => x.status === "open",
       );
@@ -491,19 +555,20 @@ export function createService(
       for (const x of changed) {
         x.status = "done";
         x.completedAt = stamp;
+        x.completedBy = id;
         x.updatedAt = stamp;
       }
       return commit(changed);
     },
     /** Reopens a task and any done ancestors. Returns changed tasks. */
     reopenTask(id: string, taskId: string) {
-      const t = ownTask(id, taskId);
+      const t = memberTask(id, taskId);
       return commit(
         reopen([t, ...ancestors(goalTasks, t)], now().toISOString()),
       );
     },
     deleteTask(id: string, taskId: string) {
-      const t = ownTask(id, taskId);
+      const t = memberTask(id, taskId);
       const ids = [t.id, ...descendants(goalTasks, t.id).map((x) => x.id)];
       const remaining = goalTasks.filter((x) => !ids.includes(x.id));
       goalTasks.splice(0, goalTasks.length, ...remaining);

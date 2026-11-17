@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { CalendarDays, Check } from "lucide-react-native";
-import { colors as c, tones, s } from "./theme";
+import { colors as c, tones, fonts, s } from "./theme";
 import { Action, Chip, Field } from "./ui";
 import { Sheet } from "./Sheet";
 import { DatePicker, goalIcons } from "./GoalParts";
+import { FriendPicker, type GoalPeople } from "./GoalPeople";
 import { formatDate } from "./goals";
 import type { Goal, GoalIcon, GoalInput, Tone } from "./types";
 
@@ -19,12 +20,17 @@ const iconNames: Record<GoalIcon, string> = {
 
 export function GoalForm({
   goal,
+  people,
   onClose,
   onSave,
+  onFindFriends,
 }: {
   goal?: Goal;
+  /** When given on create, the form offers sharing with friends. */
+  people?: GoalPeople;
   onClose: () => void;
   onSave: (input: GoalInput) => Promise<unknown>;
+  onFindFriends?: () => void;
 }) {
   const [title, setTitle] = useState(goal?.title ?? ""),
     [why, setWhy] = useState(goal?.why ?? ""),
@@ -33,6 +39,7 @@ export function GoalForm({
     ),
     [color, setColor] = useState<Tone>(goal?.color ?? "sage"),
     [icon, setIcon] = useState<GoalIcon>(goal?.icon ?? "flag"),
+    [memberIds, setMemberIds] = useState<string[]>([]),
     [picking, setPicking] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -44,7 +51,11 @@ export function GoalForm({
     setBusy(true);
     setError("");
     try {
-      await onSave({ title, why, targetDate, color, icon });
+      await onSave(
+        goal
+          ? { title, why, targetDate, color, icon }
+          : { title, why, targetDate, color, icon, memberIds },
+      );
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -163,6 +174,30 @@ export function GoalForm({
             })}
           </View>
         </View>
+        {!goal && people && (
+          <View style={{ gap: 10 }}>
+            <Text style={s.label}>
+              Share with friends (optional){" "}
+              {!!memberIds.length && (
+                <Text style={{ fontFamily: fonts.regular, color: c.muted }}>
+                  ({memberIds.length} selected)
+                </Text>
+              )}
+            </Text>
+            <Text style={[s.small, { marginTop: -4 }]}>
+              {memberIds.length
+                ? "They’ll see every task and can add and complete tasks with you."
+                : "Only you can see this goal. You can share it later too."}
+            </Text>
+            <FriendPicker
+              people={people}
+              exclude={[people.me]}
+              selected={memberIds}
+              onChange={setMemberIds}
+              onFindFriends={onFindFriends}
+            />
+          </View>
+        )}
         {!!error && (
           <Text accessibilityLiveRegion="polite" style={s.error}>
             {error}

@@ -17,7 +17,7 @@ Success means a person can:
 | Topic             | Decision                                                                                                                                                                                                             |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Placement         | **Fourth primary tab** “Goals”, between Recent posts and Profile, in both the desktop rail and the phone bottom nav. This amends the three-tab rule in `PRODUCT.md` and `DESIGN.md`.                                 |
-| Privacy           | **Private only.** Only the owner can read or write goals and tasks. There is no audience chip, sharing or search integration in v1.                                                                                  |
+| Privacy           | **Private by default, shareable with friends** (§10). v1 was owner-only; sharing was added later. Goals are never searchable.                                                                                        |
 | Refresh           | **Rows stay until refresh.** Completing a task from Goals home strikes it through in place, with Undo. The list re-ranks only when the person taps Refresh. Refresh then shows a count badge of pending completions. |
 | Parent completion | **Confirm, then complete the branch.** Completing a task with open descendants asks “Also complete N open sub-tasks?” and completes the whole branch. Reopening a task also reopens its completed ancestors.         |
 
@@ -366,7 +366,7 @@ Rules can't enforce the cascade invariant (“a done task has no open descendant
 - **Momentum counts:** every task that becomes done counts, including cascaded children. The goal count is the number of distinct goals among those tasks. Days use the device's local timezone.
 - **Priority levels:** four levels (None, Low, Medium, High). A new task defaults to None.
 - **Limits:** a maximum of 50 active goals and 500 tasks per goal.
-- **Out of scope for v1:** recurring tasks, reminders and notifications, drag-to-reorder or reparent, sharing, search integration, and live multi-device sync. The app already refreshes on action and reload.
+- **Out of scope for v1:** recurring tasks, reminders and notifications, drag-to-reorder or reparent, search integration, and live multi-device sync. (Sharing has since been added; see §10.) The app already refreshes on action and reload.
 
 ## 9. Implementation notes (differences from the proposal)
 
@@ -382,3 +382,55 @@ Rules can't enforce the cascade invariant (“a done task has no open descendant
   - `tests/firebase-goals.test.ts` (emulator rules and direct writes; part of `npm run test:rules`)
   - `tests/e2e/goals.spec.ts` (390 and 1440px flows, plus failure and retry)
 - **Not verified:** native iOS and Android appearance and behavior (bottom sheet, keyboard docking, date grid, nested modal), and the live Firebase project. Rules have not been deployed.
+
+## 10. Shared goals
+
+Goals work like circles: a goal can be shared with accepted friends, who then collaborate on it.
+
+**Behaviour**
+
+- **When:** while creating a goal (optional “Share with friends” section in the form) or later from the goal page (the person-plus button, the audience line under the header, or Goal options › Share goal).
+- **What is shared:** the whole goal, with every task old and new, done and open, so results are visible to everyone in it.
+- **Who can do what:**
+
+  | Action                                         | Owner | Member |
+  | ---------------------------------------------- | ----- | ------ |
+  | See the goal and all its tasks                 | yes   | yes    |
+  | Add, edit, complete, reopen and delete tasks   | yes   | yes    |
+  | Invite their own accepted friends              | yes   | yes    |
+  | Edit settings, mark reached, archive or delete | yes   | no     |
+  | Remove other people                            | yes   | no     |
+  | Leave the goal                                 | no    | yes    |
+
+- **Objections:** anyone who no longer wants a shared goal can leave it, and the owner can remove anyone. Their earlier work stays with the goal.
+- **Attribution:** completing a task records `completedBy`. Others see “Done by {Name}”. Momentum (“You completed …”) counts only the viewer's own completions. Tasks completed before sharing count for the goal owner.
+- **Limit:** up to 50 people per goal.
+
+**Data model**
+
+- `Goal.memberIds?: string[]` lists everyone in the goal, owner included. Goals from before sharing have no list and are treated as owner-only (`goalMembers()` in `src/goals.ts`), so they need no migration.
+- `GoalTask.ownerId` stays the **goal owner's** id whoever adds the task. The owner still loads every task with one `ownerId` query. `GoalTask.completedBy?: string | null` is set on completion and cleared on reopen.
+
+**API** (both backends; local adds `/api`)
+
+| Method & path                    | Domain method      | Notes                                                                                              |
+| -------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| `POST /goals`                    | `createGoal`       | Optional `memberIds` (accepted friends).                                                           |
+| `POST /goals/:id/members`        | `shareGoal`        | Body `{ memberIds }`. Any member; new people must be the caller's accepted friends.                |
+| `DELETE /goals/:id/members/:uid` | `removeGoalMember` | The owner removes anyone else; a member removes themself (leave). The owner can't remove themself. |
+
+`GET /goals` returns every goal the person owns or belongs to, with all of their tasks. People outside a goal get 404s, so they can't tell it exists. A member trying an owner-only action gets 403.
+
+**Firebase**
+
+- **Load:** owned goals (`ownerId ==`) plus shared goals (`memberIds array-contains`). Tasks come from the owner query plus one `goalId ==` query per goal shared with the person.
+- **Writes:**
+  - Membership changes run in a transaction that rereads the goal.
+  - Settings updates write only settings fields, so a concurrent invite is never overwritten.
+- **Rules:**
+  - Goal reads require membership.
+  - Goal updates are either an owner settings edit or a membership-only edit. A membership edit can add the editor's accepted friends, remove the editor, or (owner only) remove others. It can never drop the owner.
+  - Task reads and writes require membership of the task's goal, checked with a `get()` of the goal. A new task must carry the goal owner's id, and `completedBy` can only name the caller.
+- **Release:** deploy the updated rules before or with the client. The old rules reject `memberIds` and `completedBy`.
+
+**Tests:** `tests/goals-sharing.test.ts` (domain), `tests/goals-api.test.ts` (HTTP), `tests/firebase-goal-sharing.test.ts` (emulator rules and direct writes, part of `npm run test:rules`) and `tests/e2e/goal-sharing.spec.ts` (390 and 1440px).
