@@ -10,6 +10,8 @@ import {
   Trash,
   CircleCheck,
   RotateCcw,
+  UserPlus,
+  LogOut,
 } from "lucide-react-native";
 import { colors as c, fonts, s } from "./theme";
 import { Action, IconButton } from "./ui";
@@ -31,9 +33,17 @@ import {
 } from "./goals";
 import type { Goal, GoalTask } from "./types";
 import type { GoalsApi } from "./useGoals";
+import { SharedWith, personName, type GoalPeople } from "./GoalPeople";
 
 export type GoalMenuAction =
-  "edit" | "reached" | "active" | "archive" | "delete";
+  "edit" | "reached" | "active" | "archive" | "delete" | "share" | "leave";
+
+/** "Done by Sam" when someone else completed a task in a shared goal. */
+export function doneBy(t: GoalTask, people?: GoalPeople) {
+  if (!people || t.status !== "done" || !t.completedBy) return undefined;
+  if (t.completedBy === people.me) return undefined;
+  return `Done by ${personName(people, t.completedBy)}`;
+}
 
 export function taskLabel(t: GoalTask) {
   const parts = [t.description, priorityLabel(t.priority)].filter(Boolean);
@@ -43,6 +53,7 @@ export function taskLabel(t: GoalTask) {
 function TaskRow({
   task,
   tasks,
+  people,
   depth,
   indent,
   selected,
@@ -54,6 +65,7 @@ function TaskRow({
 }: {
   task: GoalTask;
   tasks: GoalTask[];
+  people?: GoalPeople;
   depth: number;
   indent: number;
   selected: boolean;
@@ -123,7 +135,14 @@ function TaskRow({
           >
             {task.description}
           </Text>
-          <TaskMeta task={task} extra={task.notes ? "Has notes" : undefined} />
+          <TaskMeta
+            task={task}
+            extra={
+              [doneBy(task, people), task.notes && "Has notes"]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
+          />
         </View>
         {childCount && (
           <Text style={[s.small, { fontSize: 11, paddingTop: 3 }]}>
@@ -138,6 +157,7 @@ function TaskRow({
 function TaskTree({
   goal,
   tasks,
+  people,
   showDone,
   selectedId,
   phone,
@@ -146,6 +166,7 @@ function TaskTree({
 }: {
   goal: Goal;
   tasks: GoalTask[];
+  people?: GoalPeople;
   showDone: boolean;
   selectedId: string | null;
   phone: boolean;
@@ -170,6 +191,7 @@ function TaskTree({
           key={t.id}
           task={t}
           tasks={tasks}
+          people={people}
           depth={depth}
           indent={indent}
           selected={selectedId === t.id}
@@ -196,6 +218,7 @@ function TaskTree({
 export function GoalPage({
   goal,
   api,
+  people,
   desktop,
   phone,
   selectedId,
@@ -207,6 +230,7 @@ export function GoalPage({
 }: {
   goal: Goal;
   api: GoalsApi;
+  people: GoalPeople;
   desktop: boolean;
   phone: boolean;
   selectedId: string | null;
@@ -243,21 +267,43 @@ export function GoalPage({
     .filter(Boolean)
     .join(" · ");
 
-  const menuItems: { action: GoalMenuAction; label: string; icon: any }[] = [
-    { action: "edit", label: "Edit goal", icon: PencilLine },
-    goal.status === "active"
-      ? { action: "reached", label: "Mark goal reached", icon: CircleCheck }
-      : {
-          action: "active",
-          label:
-            goal.status === "archived" ? "Restore goal" : "Back in progress",
-          icon: RotateCcw,
-        },
-    ...(goal.status !== "archived"
-      ? [{ action: "archive" as const, label: "Archive goal", icon: Archive }]
-      : []),
-    { action: "delete", label: "Delete goal", icon: Trash },
-  ];
+  const owner = goal.ownerId === people.me;
+  const share = {
+    action: "share" as const,
+    label: "Share goal",
+    icon: UserPlus,
+  };
+  const menuItems: { action: GoalMenuAction; label: string; icon: any }[] =
+    owner
+      ? [
+          share,
+          { action: "edit", label: "Edit goal", icon: PencilLine },
+          goal.status === "active"
+            ? {
+                action: "reached",
+                label: "Mark goal reached",
+                icon: CircleCheck,
+              }
+            : {
+                action: "active",
+                label:
+                  goal.status === "archived"
+                    ? "Restore goal"
+                    : "Back in progress",
+                icon: RotateCcw,
+              },
+          ...(goal.status !== "archived"
+            ? [
+                {
+                  action: "archive" as const,
+                  label: "Archive goal",
+                  icon: Archive,
+                },
+              ]
+            : []),
+          { action: "delete", label: "Delete goal", icon: Trash },
+        ]
+      : [share, { action: "leave", label: "Leave goal", icon: LogOut }];
 
   return (
     <View style={{ gap: 18 }}>
@@ -289,13 +335,24 @@ export function GoalPage({
               {meta}
             </Text>
           )}
+          {!owner && (
+            <Text style={[s.text, { fontSize: 13, color: c.muted }]}>
+              {personName(people, goal.ownerId)}’s goal
+            </Text>
+          )}
         </View>
+        <IconButton
+          icon={UserPlus}
+          label="Share goal"
+          onPress={() => onMenu("share")}
+        />
         <IconButton
           icon={Ellipsis}
           label="Goal options"
           onPress={() => setMenu(true)}
         />
       </View>
+      <SharedWith goal={goal} people={people} onPress={() => onMenu("share")} />
       {!!goal.why && (
         <Text style={[s.text, { fontSize: 13, color: c.muted }]}>
           Why it matters: {goal.why}
@@ -307,35 +364,38 @@ export function GoalPage({
           {progress.done} / {progress.total}
         </Text>
       </View>
-      {goal.status === "active" && progress.total > 0 && open === 0 && (
-        <View
-          style={[
-            s.between,
-            {
-              backgroundColor: c.greenLight,
-              borderRadius: 14,
-              padding: 16,
-              gap: 12,
-              flexWrap: "wrap",
-            },
-          ]}
-        >
-          <Text
+      {owner &&
+        goal.status === "active" &&
+        progress.total > 0 &&
+        open === 0 && (
+          <View
             style={[
-              s.text,
+              s.between,
               {
-                color: c.green,
-                fontFamily: fonts.medium,
-                flex: 1,
-                minWidth: 180,
+                backgroundColor: c.greenLight,
+                borderRadius: 14,
+                padding: 16,
+                gap: 12,
+                flexWrap: "wrap",
               },
             ]}
           >
-            Every step is done. Did you reach this goal?
-          </Text>
-          <Action onPress={() => onMenu("reached")}>Mark goal reached</Action>
-        </View>
-      )}
+            <Text
+              style={[
+                s.text,
+                {
+                  color: c.green,
+                  fontFamily: fonts.medium,
+                  flex: 1,
+                  minWidth: 180,
+                },
+              ]}
+            >
+              Every step is done. Did you reach this goal?
+            </Text>
+            <Action onPress={() => onMenu("reached")}>Mark goal reached</Action>
+          </View>
+        )}
       <View style={{ flexDirection: "row", gap: 28, alignItems: "flex-start" }}>
         <View
           style={[
@@ -412,6 +472,7 @@ export function GoalPage({
             <TaskTree
               goal={goal}
               tasks={tasks}
+              people={people}
               showDone={showDone}
               selectedId={selectedId}
               phone={phone}
@@ -424,6 +485,7 @@ export function GoalPage({
                 key={t.id}
                 task={t}
                 tasks={tasks}
+                people={people}
                 depth={0}
                 indent={0}
                 selected={selectedId === t.id}

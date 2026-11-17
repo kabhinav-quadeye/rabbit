@@ -762,7 +762,13 @@ function Rabbit() {
               </View>
             </View>
             {tab === "goals" ? (
-              <GoalsScreen desktop={desktop} wide={wide} onToast={setToast} />
+              <GoalsScreen
+                space={data}
+                desktop={desktop}
+                wide={wide}
+                onToast={setToast}
+                onFindFriends={() => navigate("profile")}
+              />
             ) : (
               <ScrollView
                 ref={scroll}

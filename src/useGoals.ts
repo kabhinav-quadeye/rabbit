@@ -28,7 +28,7 @@ const snapshotOf = (data: GoalsOverview) =>
  * at the last refresh, so completed rows stay put (struck through, with undo)
  * until the person asks for the next tasks. Pending changes drive the Refresh badge.
  */
-export function useGoals() {
+export function useGoals(me?: string) {
   const [data, setData] = useState<GoalsOverview | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -43,14 +43,14 @@ export function useGoals() {
       const next = await request<GoalsOverview>("/goals");
       setData(next);
       setSnapshot(snapshotOf(next));
-      setStats(momentum(next.tasks, new Date()));
+      setStats(momentum(next.tasks, new Date(), me));
       setPending([]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [me]);
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -59,13 +59,21 @@ export function useGoals() {
   const resnapshot = () => {
     if (!data) return;
     setSnapshot(snapshotOf(data));
-    setStats(momentum(data.tasks, new Date()));
+    setStats(momentum(data.tasks, new Date(), me));
     setPending([]);
   };
   const mergeTasks = (changed: GoalTask[]) =>
     setData((d) => d && { ...d, tasks: upsert(d.tasks, changed) });
   const mergeGoal = (goal: Goal) =>
     setData((d) => d && { ...d, goals: upsert(d.goals, [goal]) });
+  const dropGoal = (id: string) =>
+    setData(
+      (d) =>
+        d && {
+          goals: d.goals.filter((g) => g.id !== id),
+          tasks: d.tasks.filter((t) => t.goalId !== id),
+        },
+    );
   const markPending = (id: string) =>
     setPending((p) =>
       p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
@@ -93,13 +101,25 @@ export function useGoals() {
     },
     async deleteGoal(id: string) {
       await request(`/goals/${id}`, "DELETE");
-      setData(
-        (d) =>
-          d && {
-            goals: d.goals.filter((g) => g.id !== id),
-            tasks: d.tasks.filter((t) => t.goalId !== id),
-          },
+      dropGoal(id);
+    },
+    /** Shares the goal, with its whole history, with more friends. */
+    async shareGoal(id: string, memberIds: string[]) {
+      const goal = await request<Goal>(`/goals/${id}/members`, "POST", {
+        memberIds,
+      });
+      mergeGoal(goal);
+      return goal;
+    },
+    /** Removes someone; when it is the viewer, they have left the goal. */
+    async removeMember(id: string, userId: string) {
+      const goal = await request<Goal>(
+        `/goals/${id}/members/${encodeURIComponent(userId)}`,
+        "DELETE",
       );
+      if (userId === me) dropGoal(id);
+      else mergeGoal(goal);
+      return goal;
     },
     async createTask(goalId: string, input: TaskInput) {
       const changed = await request<GoalTask[]>(

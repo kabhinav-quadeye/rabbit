@@ -193,3 +193,73 @@ test("goals persist across an SQLite restart", async () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("goal sharing routes let friends collaborate and leave", async () => {
+  const app = await start();
+  try {
+    const at = await app.register("Alice");
+    const bt = await app.register("Bob");
+    const et = await app.register("Eve");
+    const me = async (token: string) =>
+      (await app.call("/bootstrap", "GET", undefined, token)).data.currentUser
+        .id as string;
+    const [a, b, e] = [await me(at), await me(bt), await me(et)];
+    const request = (
+      await app.call("/friends/requests", "POST", { recipientId: b }, at)
+    ).data;
+    await app.call(
+      `/friends/requests/${request.id}`,
+      "PATCH",
+      { status: "accepted" },
+      bt,
+    );
+    const g = (await app.call("/goals", "POST", { title: "Trip" }, at)).data;
+    await app.call(`/goals/${g.id}/tasks`, "POST", { description: "Old" }, at);
+    assert.equal(
+      (await app.call(`/goals/${g.id}/members`, "POST", { memberIds: [e] }, at))
+        .status,
+      403,
+    );
+    const shared = await app.call(
+      `/goals/${g.id}/members`,
+      "POST",
+      { memberIds: [b] },
+      at,
+    );
+    assert.equal(shared.status, 200);
+    assert.deepEqual(shared.data.memberIds, [a, b]);
+    const view = (await app.call("/goals", "GET", undefined, bt)).data;
+    assert.deepEqual(
+      view.tasks.map((t: any) => t.description),
+      ["Old"],
+    );
+    const added = await app.call(
+      `/goals/${g.id}/tasks`,
+      "POST",
+      { description: "New from Bob" },
+      bt,
+    );
+    assert.equal(added.status, 201);
+    assert.equal(
+      (await app.call(`/goals/${g.id}`, "PATCH", { title: "Mine" }, bt)).status,
+      403,
+    );
+    assert.equal(
+      (await app.call("/goals", "GET", undefined, et)).data.goals.length,
+      0,
+    );
+    const left = await app.call(
+      `/goals/${g.id}/members/${b}`,
+      "DELETE",
+      undefined,
+      bt,
+    );
+    assert.deepEqual(left.data.memberIds, [a]);
+    assert.equal(
+      (await app.call("/goals", "GET", undefined, bt)).data.goals.length,
+      0,
+    );
+  } finally {
+    await app.stop();
+  }
+});

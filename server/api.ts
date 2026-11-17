@@ -331,6 +331,25 @@ export function createApi(options: Options = {}) {
         send(service.createGoal(id, await body(req)), 201);
         return;
       }
+      const memberMatch = path.match(
+        /^\/api\/goals\/([^/]+)\/members(?:\/([^/]+))?$/,
+      );
+      if (memberMatch && !memberMatch[2] && req.method === "POST") {
+        send(
+          service.shareGoal(id, memberMatch[1], (await body(req)).memberIds),
+        );
+        return;
+      }
+      if (memberMatch && memberMatch[2] && req.method === "DELETE") {
+        send(
+          service.removeGoalMember(
+            id,
+            memberMatch[1],
+            decodeURIComponent(memberMatch[2]),
+          ),
+        );
+        return;
+      }
       const goalMatch = path.match(/^\/api\/goals\/([^/]+)(\/tasks)?$/);
       if (goalMatch && goalMatch[2] && req.method === "POST") {
         send(service.createTask(id, goalMatch[1], await body(req)), 201);
