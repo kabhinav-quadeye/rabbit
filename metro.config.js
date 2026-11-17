@@ -5,7 +5,12 @@ const config = getDefaultConfig(__dirname);
 config.server = {
   ...config.server,
   enhanceMiddleware: (middleware) => (req, res, next) => {
-    if (!req.url.startsWith("/api/")) return middleware(req, res, next);
+    const path = req.url.split("?")[0];
+    if (
+      !path.startsWith("/api/") &&
+      !["/AGENTS.md", "/docs", "/docs/agents.md"].includes(path)
+    )
+      return middleware(req, res, next);
     const upstream = http.request(
       {
         hostname: "127.0.0.1",

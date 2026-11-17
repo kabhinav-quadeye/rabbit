@@ -1,20 +1,25 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-// Match Expo's local configuration without starting the legacy SQLite API when
-// this checkout is connected directly to Firebase.
+// Agent management uses a trusted gateway even when the app reads Firebase directly.
 for (const file of [".env.local", ".env"]) {
   if (existsSync(file)) process.loadEnvFile(file);
 }
+const firebase =
+  !!process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID &&
+  process.env.EXPO_PUBLIC_BACKEND !== "local";
 const children = [
-  ...(!process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ||
-  process.env.EXPO_PUBLIC_BACKEND === "local"
-    ? [
-        spawn(process.execPath, ["server/index.ts"], {
-          stdio: "inherit",
-          env: process.env,
-        }),
-      ]
-    : []),
+  spawn(process.execPath, ["server/index.ts"], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      ...(firebase
+        ? {
+            RABBIT_AGENT_BACKEND: "firebase",
+            FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+          }
+        : {}),
+    },
+  }),
   spawn(
     "npx",
     ["expo", "start", "--web", "--port", process.env.WEB_PORT ?? "8081"],

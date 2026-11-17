@@ -15,16 +15,33 @@ import { loginEmail } from "../src/identity.ts";
 import { seedState } from "./seed.ts";
 import type { State } from "../src/types.ts";
 
+import {
+  agentOwner,
+  agentRequest,
+  managementRequest,
+  handleAgents,
+} from "./agents.ts";
+
 type Options = {
   dbPath?: string;
+  firebaseAgents?: boolean;
   seed?: boolean;
   demoEnabled?: boolean;
   staticDir?: string;
 };
 export function createApi(options: Options = {}) {
+  let firebaseGateway:
+    | ((
+        path: string,
+        method: string,
+        input: unknown,
+        token: string,
+      ) => Promise<unknown>)
+    | undefined;
   const demoEnabled =
-    options.demoEnabled ??
-    (process.env.NODE_ENV !== "production" && process.env.DEMO_MODE !== "0");
+    !options.firebaseAgents &&
+    (options.demoEnabled ??
+      (process.env.NODE_ENV !== "production" && process.env.DEMO_MODE !== "0"));
   const db = new DatabaseSync(options.dbPath ?? "data/rabbit.sqlite");
   db.exec(
     `PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS credentials (email TEXT PRIMARY KEY, user_id TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires INTEGER NOT NULL);`,
@@ -89,7 +106,7 @@ export function createApi(options: Options = {}) {
     );
     res.setHeader(
       "Access-Control-Allow-Methods",
-      "GET, POST, PATCH, DELETE, OPTIONS",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     );
     res.setHeader("X-Content-Type-Options", "nosniff");
     if (req.method === "OPTIONS") {
@@ -107,6 +124,87 @@ export function createApi(options: Options = {}) {
       res.end(JSON.stringify(data));
     };
     try {
+      if (
+        path === "/AGENTS.md" ||
+        path === "/docs" ||
+        path === "/docs/agents.md"
+      ) {
+        res.writeHead(200, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(
+          await readFile(
+            new URL(
+              path === "/AGENTS.md"
+                ? "../docs/agent-guide.md"
+                : "../docs/agent-api.md",
+              import.meta.url,
+            ),
+          ),
+        );
+        return;
+      }
+      // Finish asynchronous input parsing before reading credentials or mutable state.
+      const input =
+        req.method === "GET" || req.method === "HEAD" ? {} : await body(req);
+      if (agentRequest(path) || managementRequest(path)) {
+        const token = req.headers.authorization?.replace(/^Bearer /, "") ?? "";
+        if (options.firebaseAgents) {
+          firebaseGateway ??= (
+            await import("./firebase-agents.ts")
+          ).createFirebaseAgentGateway();
+          const data = await firebaseGateway(
+            path,
+            req.method ?? "GET",
+            req.method === "GET" ? Object.fromEntries(url.searchParams) : input,
+            token,
+          );
+          send(
+            data,
+            req.method === "POST" &&
+              ["/api/agents/tokens", "/api/agent/drafts"].includes(path)
+              ? 201
+              : 200,
+          );
+          return;
+        }
+        const owner = agentRequest(path) ? agentOwner(state, token) : auth(req);
+        const next = structuredClone(state);
+        try {
+          const result = handleAgents(
+            next,
+            owner,
+            path,
+            req.method ?? "GET",
+            req.method === "GET" ? Object.fromEntries(url.searchParams) : input,
+            token,
+          );
+          save(next);
+          service = createService(state, save);
+          send(
+            result,
+            req.method === "POST" &&
+              ["/api/agents/tokens", "/api/agent/drafts"].includes(path)
+              ? 201
+              : 200,
+          );
+        } catch (error) {
+          // Failed calls consume their budget but cannot persist a partial mutation.
+          const account = next.agentAccounts?.find((a) => a.ownerId === owner);
+          const original = state.agentAccounts?.find(
+            (a) => a.ownerId === owner,
+          );
+          if (account && original) {
+            original.requests = account.requests;
+            original.windowStart = account.windowStart;
+            save(state);
+            service = createService(state, save);
+          }
+          throw error;
+        }
+        return;
+      }
       if (!path.startsWith("/api/")) {
         if (!options.staticDir) throw new AppError("Not found.", 404);
         const root = resolve(options.staticDir);
@@ -135,6 +233,7 @@ export function createApi(options: Options = {}) {
         send({ ok: true, demo: demoEnabled });
         return;
       }
+      if (options.firebaseAgents) throw new AppError("Not found.", 404);
       if (path === "/api/auth/demo" && req.method === "POST") {
         if (!demoEnabled || !state.users.some((u) => u.id === "alex"))
           throw new AppError("Not found.", 404);
@@ -162,7 +261,6 @@ export function createApi(options: Options = {}) {
               ? current.until
               : Date.now() + 60000,
         });
-        const input = await body(req);
         let email: string;
         try {
           email = loginEmail(String(input.email ?? ""));
@@ -275,7 +373,7 @@ export function createApi(options: Options = {}) {
         return;
       }
       if (path === "/api/friends/requests" && req.method === "POST") {
-        send(service.sendFriendRequest(id, (await body(req)).recipientId), 201);
+        send(service.sendFriendRequest(id, input.recipientId), 201);
         return;
       }
       const friendMatch = path.match(/^\/api\/friends\/requests\/([^/]+)$/);
@@ -284,28 +382,26 @@ export function createApi(options: Options = {}) {
           service.respondToFriendRequest(
             id,
             decodeURIComponent(friendMatch[1]),
-            (await body(req)).status,
+            input.status,
           ),
         );
         return;
       }
       if (path === "/api/posts" && req.method === "POST") {
-        send(service.createPost(id, await body(req)), 201);
+        send(service.createPost(id, input), 201);
         return;
       }
       if (path === "/api/groups" && req.method === "POST") {
-        send(service.createGroup(id, await body(req)), 201);
+        send(service.createGroup(id, input), 201);
         return;
       }
       if (path === "/api/profile" && req.method === "PATCH") {
-        send(service.updateProfile(id, await body(req)));
+        send(service.updateProfile(id, input));
         return;
       }
       const groupMatch = path.match(/^\/api\/groups\/([^/]+)\/members$/);
       if (groupMatch && req.method === "POST") {
-        send(
-          service.addMembers(id, groupMatch[1], (await body(req)).memberIds),
-        );
+        send(service.addMembers(id, groupMatch[1], input.memberIds));
         return;
       }
       const postMatch = path.match(
@@ -319,7 +415,7 @@ export function createApi(options: Options = {}) {
               ? service.toggleVote(id, postMatch[1])
               : postMatch[2] === "outdated"
                 ? service.toggleOutdated(id, postMatch[1])
-                : service.addComment(id, postMatch[1], (await body(req)).body),
+                : service.addComment(id, postMatch[1], input.body),
         );
         return;
       }
@@ -328,16 +424,16 @@ export function createApi(options: Options = {}) {
         return;
       }
       if (path === "/api/goals" && req.method === "POST") {
-        send(service.createGoal(id, await body(req)), 201);
+        send(service.createGoal(id, input), 201);
         return;
       }
       const goalMatch = path.match(/^\/api\/goals\/([^/]+)(\/tasks)?$/);
       if (goalMatch && goalMatch[2] && req.method === "POST") {
-        send(service.createTask(id, goalMatch[1], await body(req)), 201);
+        send(service.createTask(id, goalMatch[1], input), 201);
         return;
       }
       if (goalMatch && !goalMatch[2] && req.method === "PATCH") {
-        send(service.updateGoal(id, goalMatch[1], await body(req)));
+        send(service.updateGoal(id, goalMatch[1], input));
         return;
       }
       if (goalMatch && !goalMatch[2] && req.method === "DELETE") {
@@ -348,7 +444,6 @@ export function createApi(options: Options = {}) {
         /^\/api\/tasks\/([^/]+)(?:\/(complete|reopen))?$/,
       );
       if (taskMatch && taskMatch[2] && req.method === "POST") {
-        const input = await body(req);
         send(
           taskMatch[2] === "complete"
             ? service.completeTask(id, taskMatch[1], input.cascade === true)
@@ -357,7 +452,7 @@ export function createApi(options: Options = {}) {
         return;
       }
       if (taskMatch && !taskMatch[2] && req.method === "PATCH") {
-        send(service.updateTask(id, taskMatch[1], await body(req)));
+        send(service.updateTask(id, taskMatch[1], input));
         return;
       }
       if (taskMatch && !taskMatch[2] && req.method === "DELETE") {
