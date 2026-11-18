@@ -25,6 +25,7 @@ async function start(
   ) => {
     const r = await fetch(`http://127.0.0.1:${address.port}/api${path}`, {
       method,
+      signal: path === "/mcp" ? AbortSignal.timeout(3000) : undefined,
       headers: {
         "Content-Type": "application/json",
         ...(path === "/mcp"
@@ -34,6 +35,10 @@ async function start(
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    if (r.headers.get("Content-Type")?.includes("text/event-stream")) {
+      await r.body?.cancel();
+      return { status: r.status, data: null };
+    }
     return { status: r.status, data: (await r.json()) as any };
   };
   return {
@@ -559,6 +564,7 @@ test("agent tools queue private proposals and only the account owner can approve
     );
     assert.equal(connection.status, 201);
     const key = connection.data.token;
+    assert.equal((await app.call("/mcp", "GET", undefined, key)).status, 405);
     const privatePost = await app.call(
       "/posts",
       "POST",

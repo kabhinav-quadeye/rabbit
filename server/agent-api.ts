@@ -67,7 +67,13 @@ export async function serveAgent(
         res.setHeader("WWW-Authenticate", "Bearer");
         throw new AppError("Supply an active Rabbit agent key.", 401);
       }
-      const input = req.method === "POST" ? await readJsonBody(req) : undefined;
+      // These stateless endpoints only return JSON responses to POST requests.
+      // A GET event stream would hold open a function with no events to send.
+      if (req.method !== "POST") {
+        res.setHeader("Allow", "POST");
+        throw new AppError("Method not allowed.", 405);
+      }
+      const input = await readJsonBody(req);
       await handleMcp(req, res, input, actions(uid));
       return;
     }
