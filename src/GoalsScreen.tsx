@@ -6,13 +6,11 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import {
-  ChevronRight,
-  ChevronDown,
-  Plus,
-  RefreshCw,
-  Sprout,
-} from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import Sprout from "lucide-react-native/icons/sprout";
 import { colors as c, tones, fonts, s } from "./theme";
 import { Action } from "./ui";
 import { Sheet } from "./Sheet";

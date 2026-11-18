@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { X } from "lucide-react-native";
+import X from "lucide-react-native/icons/x";
 import { colors as c, s } from "./theme";
 import { IconButton } from "./ui";
 export function Sheet({

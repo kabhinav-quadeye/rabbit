@@ -111,3 +111,35 @@ test("shows a reconnect page for an offline launch", async ({
     page.getByRole("heading", { name: "You’re offline" }),
   ).toBeVisible();
 });
+
+test("Home renders real circle data while the web fonts are pending", async ({
+  page,
+}) => {
+  let releaseFonts!: () => void;
+  const fontsPending = new Promise<void>((resolve) => {
+    releaseFonts = resolve;
+  });
+  await page.route(/\.ttf(?:\?|$)/, async (route) => {
+    await fontsPending;
+    await route.continue();
+  });
+  try {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: "Go to Design circle", exact: true }),
+    ).toBeVisible({ timeout: 8000 });
+    const fontDisplay = await page.evaluate(() => {
+      const stylesheet = document.querySelector<HTMLStyleElement>(
+        "#expo-generated-fonts",
+      )?.sheet;
+      return [...(stylesheet?.cssRules ?? [])]
+        .filter(
+          (rule): rule is CSSFontFaceRule => rule instanceof CSSFontFaceRule,
+        )
+        .map((rule) => rule.style.getPropertyValue("font-display"));
+    });
+    expect(fontDisplay).toEqual(["swap", "swap", "swap", "swap"]);
+  } finally {
+    releaseFonts();
+  }
+});

@@ -13,40 +13,34 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useFonts } from "expo-font";
+import { FontDisplay, useFonts } from "expo-font";
 import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
 import { DMSans_500Medium } from "@expo-google-fonts/dm-sans/500Medium";
 import { DMSans_600SemiBold } from "@expo-google-fonts/dm-sans/600SemiBold";
 import { DMSans_700Bold } from "@expo-google-fonts/dm-sans/700Bold";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  SquarePen,
-  Clock3,
-  UserRound,
-  Plus,
-  Search,
-  LockKeyhole,
-  ArrowUpRight,
-  ArrowRight,
-  ChevronRight,
-  ChevronDown,
-  BookOpen,
-  Bookmark,
-  Users,
-  Grid2X2,
-  X,
-  LogOut,
-  Download,
-  SlidersHorizontal,
-  ArrowLeft,
-  Check,
-  Hash,
-  FileText,
-  Send,
-  CircleHelp,
-  Leaf,
-  Sprout,
-} from "lucide-react-native";
+import SquarePen from "lucide-react-native/icons/square-pen";
+import Clock3 from "lucide-react-native/icons/clock-3";
+import UserRound from "lucide-react-native/icons/user-round";
+import Plus from "lucide-react-native/icons/plus";
+import Search from "lucide-react-native/icons/search";
+import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
+import ArrowUpRight from "lucide-react-native/icons/arrow-up-right";
+import ArrowRight from "lucide-react-native/icons/arrow-right";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import Bookmark from "lucide-react-native/icons/bookmark";
+import Users from "lucide-react-native/icons/users";
+import Grid2X2 from "lucide-react-native/icons/grid-2x2";
+import X from "lucide-react-native/icons/x";
+import LogOut from "lucide-react-native/icons/log-out";
+import Download from "lucide-react-native/icons/download";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import Check from "lucide-react-native/icons/check";
+import Hash from "lucide-react-native/icons/hash";
+import FileText from "lucide-react-native/icons/file-text";
+import Sprout from "lucide-react-native/icons/sprout";
 import { GluestackUIProvider } from "./components/ui/gluestack-ui-provider";
 import { colors as c, tones, fonts, s } from "./src/theme";
 import {
@@ -85,18 +79,19 @@ const navItems = [
   { id: "goals" as Tab, label: "Goals", icon: Sprout },
   { id: "profile" as Tab, label: "Profile", icon: UserRound },
 ];
+const fontSource = (uri: number) => ({ uri, display: FontDisplay.SWAP });
 export default function App() {
   const [loaded, error] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
-    DMSans_700Bold,
+    DMSans_400Regular: fontSource(DMSans_400Regular),
+    DMSans_500Medium: fontSource(DMSans_500Medium),
+    DMSans_600SemiBold: fontSource(DMSans_600SemiBold),
+    DMSans_700Bold: fontSource(DMSans_700Bold),
   });
   return (
     <SafeAreaProvider>
       <GluestackUIProvider mode="light">
         <StatusBar style="dark" />
-        {loaded || error ? (
+        {Platform.OS === "web" || loaded || error ? (
           <Rabbit />
         ) : (
           <View

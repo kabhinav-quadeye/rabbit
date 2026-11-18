@@ -1,11 +1,61 @@
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+const assetCache = "rabbit-build-assets-v1";
+const bundle =
+  /^\/_expo\/static\/(?:js\/web\/.+-[a-f0-9]{32}\.js|css\/.+-[a-f0-9]{32}\.css)$/;
+const font = /^\/assets\/.+\.[a-f0-9]{32}\.ttf$/;
+
+async function storeBuildAsset(cache, request, response) {
+  try {
+    await cache.put(request, response);
+    const keys = await cache.keys();
+    await Promise.all(
+      keys
+        .slice(0, Math.max(0, keys.length - 40))
+        .map((key) => cache.delete(key)),
+    );
+  } catch {
+    // Browser storage can be unavailable or full.
+  }
+}
+
+async function buildAsset(event) {
+  const { request } = event;
+  const cache = await caches.open(assetCache).catch(() => null);
+  const hit = await cache?.match(request).catch(() => undefined);
+  if (hit) return hit;
+
+  const response = await fetch(request);
+  // A missing asset can be rewritten to index.html by the static host.
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (
+    cache &&
+    response.ok &&
+    !response.redirected &&
+    /^(?:text\/(?:javascript|css)|application\/(?:javascript|octet-stream)|font\/ttf)(?:;|$)/i.test(
+      contentType,
+    )
+  ) {
+    event.waitUntil(storeBuildAsset(cache, request, response.clone()));
+  }
+  return response;
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  // Only handle launches of the app shell. Leave API and asset requests alone.
-  if (request.mode !== "navigate" || new URL(request.url).pathname !== "/") {
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || request.method !== "GET") return;
+  if (!url.search && (bundle.test(url.pathname) || font.test(url.pathname))) {
+    event.respondWith(buildAsset(event));
+    return;
+  }
+  if (request.mode !== "navigate" || url.pathname !== "/") {
     return;
   }
   event.respondWith(

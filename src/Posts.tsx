@@ -7,18 +7,14 @@ import {
   Linking,
   ActivityIndicator,
 } from "react-native";
-import {
-  ArrowUp,
-  ClockAlert,
-  Bookmark,
-  MessageCircle,
-  ArrowUpRight,
-  LockKeyhole,
-  Link2,
-  Send,
-  CircleHelp,
-  FileText,
-} from "lucide-react-native";
+import ArrowUp from "lucide-react-native/icons/arrow-up";
+import ClockAlert from "lucide-react-native/icons/clock-alert";
+import Bookmark from "lucide-react-native/icons/bookmark";
+import MessageCircle from "lucide-react-native/icons/message-circle";
+import ArrowUpRight from "lucide-react-native/icons/arrow-up-right";
+import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
+import Link2 from "lucide-react-native/icons/link-2";
+import Send from "lucide-react-native/icons/send";
 import { colors as c, fonts, s, tones } from "./theme";
 import { Action, Avatar, Empty } from "./ui";
 import { Sheet } from "./Sheet";

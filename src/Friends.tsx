@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text } from "react-native";
-import { RefreshCw, UserPlus } from "lucide-react-native";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import UserPlus from "lucide-react-native/icons/user-plus";
 import { Action, Avatar, Field, IconButton } from "./ui";
 import { colors as c, s } from "./theme";
 import { request } from "./api";

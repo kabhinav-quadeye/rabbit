@@ -1,13 +1,10 @@
 import React, { useState } from "react";
 import { View, Text, Pressable, TextInput } from "react-native";
-import {
-  Plus,
-  ArrowUpRight,
-  Check,
-  Search,
-  LockKeyhole,
-  Users,
-} from "lucide-react-native";
+import Plus from "lucide-react-native/icons/plus";
+import ArrowUpRight from "lucide-react-native/icons/arrow-up-right";
+import Check from "lucide-react-native/icons/check";
+import Search from "lucide-react-native/icons/search";
+import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
 import { colors as c, tones, fonts, s } from "./theme";
 import { Action, Avatar, GroupIcon, Field } from "./ui";
 import { Sheet } from "./Sheet";

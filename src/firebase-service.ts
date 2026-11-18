@@ -107,58 +107,66 @@ export function createFirebaseService(
   }
   async function load(ensure = true): Promise<Bootstrap> {
     const uid = id();
-    if (ensure) await ensureProfile();
-    const [users, groups, sent, received] = await Promise.all([
-      getDocs(collection(db, "users")),
-      getDocs(
-        query(
-          collection(db, "groups"),
-          where("memberIds", "array-contains", uid),
-        ),
-      ),
-      getDocs(
-        query(collection(db, "friendRequests"), where("senderId", "==", uid)),
-      ),
-      getDocs(
-        query(
-          collection(db, "friendRequests"),
-          where("recipientId", "==", uid),
-        ),
-      ),
-    ]);
-    const circles = groups.docs.map((d) => d.data() as Group);
-    const queries = [
-      query(collection(db, "posts"), where("authorId", "==", uid)),
+    const posts = collection(db, "posts");
+    const membership = getDocs(
       query(
-        collection(db, "posts"),
-        where("audienceType", "==", "user"),
-        where("audienceId", "==", uid),
+        collection(db, "groups"),
+        where("memberIds", "array-contains", uid),
       ),
-      ...circles.map((g) =>
-        query(
-          collection(db, "posts"),
-          where("audienceType", "==", "group"),
-          where("audienceId", "==", g.id),
+    ).then((snapshot) => snapshot.docs.map((d) => d.data() as Group));
+    const circlePosts = membership.then((circles) =>
+      Promise.all(
+        circles.map((group) =>
+          getDocs(
+            query(
+              posts,
+              where("audienceType", "==", "group"),
+              where("audienceId", "==", group.id),
+            ),
+          ),
         ),
       ),
-    ];
-    const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
-    const posts = [
+    );
+    const people = friendState(uid).then(async (state) => {
+      if (!ensure) return state;
+      const profile = state.users.find((user) => user.id === uid);
+      if (profile) {
+        const username = await getDoc(doc(db, "usernames", profile.handle));
+        if (username.data()?.userId === uid) return state;
+      }
+      // Preserve recovery for accounts or imported profiles missing setup.
+      await ensureProfile();
+      if (!profile) {
+        const created = await getDoc(doc(db, "users", uid));
+        if (created.exists()) state.users.push(created.data() as User);
+      }
+      return state;
+    });
+    const [state, circles, authored, received, shared] = await Promise.all([
+      people,
+      membership,
+      getDocs(query(posts, where("authorId", "==", uid))),
+      getDocs(
+        query(
+          posts,
+          where("audienceType", "==", "user"),
+          where("audienceId", "==", uid),
+        ),
+      ),
+      circlePosts,
+    ]);
+    const visiblePosts = [
       ...new Map(
-        snapshots.flatMap((s) =>
+        [authored, received, ...shared].flatMap((s) =>
           s.docs.map((d) => [d.id, d.data() as Post] as const),
         ),
       ).values(),
     ];
-    const state: State = {
-      users: users.docs.map((d) => d.data() as User),
+    const space = createService({
+      ...state,
       groups: circles,
-      posts,
-      friendRequests: [...sent.docs, ...received.docs].map(
-        (d) => d.data() as FriendRequest,
-      ),
-    };
-    const space = createService(state).bootstrap(uid);
+      posts: visiblePosts,
+    }).bootstrap(uid);
     space.currentUser.email = auth.currentUser!.email ?? undefined;
     return space;
   }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, Pressable } from "react-native";
-import { CalendarDays, Check } from "lucide-react-native";
+import CalendarDays from "lucide-react-native/icons/calendar-days";
+import Check from "lucide-react-native/icons/check";
 import { colors as c, tones, fonts, s } from "./theme";
 import { Action, Chip, Field } from "./ui";
 import { Sheet } from "./Sheet";

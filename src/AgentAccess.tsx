@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { Copy, KeyRound, LockKeyhole } from "lucide-react-native";
+import Copy from "lucide-react-native/icons/copy";
+import KeyRound from "lucide-react-native/icons/key-round";
+import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
 import * as Clipboard from "expo-clipboard";
 import { agentEndpoint, request } from "./api";
 import type { AgentProposal } from "./agent";

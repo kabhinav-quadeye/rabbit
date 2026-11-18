@@ -1,22 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  LockKeyhole,
-  ChevronDown,
-  FileText,
-  Link2,
-  CircleHelp,
-  Plus,
-  ArrowUpRight,
-  Hash,
-  UserRound,
-  Check,
-  Users,
-  Palette,
-  Blocks,
-  BookOpen,
-} from "lucide-react-native";
+import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import FileText from "lucide-react-native/icons/file-text";
+import Link2 from "lucide-react-native/icons/link-2";
+import CircleHelp from "lucide-react-native/icons/circle-question-mark";
+import ArrowUpRight from "lucide-react-native/icons/arrow-up-right";
+import Hash from "lucide-react-native/icons/hash";
+import UserRound from "lucide-react-native/icons/user-round";
+import Check from "lucide-react-native/icons/check";
+import Users from "lucide-react-native/icons/users";
+import Palette from "lucide-react-native/icons/palette";
+import Blocks from "lucide-react-native/icons/blocks";
+import BookOpen from "lucide-react-native/icons/book-open";
 import { Textarea, TextareaInput } from "../components/ui/textarea";
 import { colors as c, fonts, s, tones } from "./theme";
 import { Action, Avatar, GroupIcon, Chip } from "./ui";

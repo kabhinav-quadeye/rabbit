@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AppState, Platform, Pressable, Text, View } from "react-native";
-import { Mic, Square } from "lucide-react-native";
+import Mic from "lucide-react-native/icons/mic";
+import Square from "lucide-react-native/icons/square";
 import { speech } from "./speech";
 import { colors as c, s } from "./theme";
 

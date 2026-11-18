@@ -1,17 +1,11 @@
 import React from "react";
 import { View, Text, Pressable, TextInput, Platform } from "react-native";
 import type { ViewStyle, TextStyle, TextInputProps } from "react-native";
-import {
-  ArrowUpRight,
-  ArrowRight,
-  LockKeyhole,
-  Users,
-  Palette,
-  Blocks,
-  BookOpen,
-  Check,
-  LoaderCircle,
-} from "lucide-react-native";
+import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
+import Users from "lucide-react-native/icons/users";
+import Palette from "lucide-react-native/icons/palette";
+import Blocks from "lucide-react-native/icons/blocks";
+import BookOpen from "lucide-react-native/icons/book-open";
 import Svg, { Path, Circle } from "react-native-svg";
 import { Button, ButtonText } from "../components/ui/button";
 import { Input, InputField } from "../components/ui/input";

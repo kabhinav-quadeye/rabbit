@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, Pressable, Platform } from "react-native";
-import { ArrowRight, LockKeyhole } from "lucide-react-native";
+import ArrowRight from "lucide-react-native/icons/arrow-right";
 import { Brand, Action, Field, Privacy } from "./ui";
 import { colors as c, fonts, s } from "./theme";
 import { firebaseEnabled } from "./api";

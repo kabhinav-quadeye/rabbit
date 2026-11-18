@@ -1,18 +1,16 @@
 import React, { useState } from "react";
 import { View, Text, Pressable } from "react-native";
-import {
-  ArrowLeft,
-  ChevronDown,
-  ChevronRight,
-  Ellipsis,
-  PencilLine,
-  Archive,
-  Trash,
-  CircleCheck,
-  RotateCcw,
-  UserPlus,
-  LogOut,
-} from "lucide-react-native";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Ellipsis from "lucide-react-native/icons/ellipsis";
+import PencilLine from "lucide-react-native/icons/pencil-line";
+import Archive from "lucide-react-native/icons/archive";
+import Trash from "lucide-react-native/icons/trash";
+import CircleCheck from "lucide-react-native/icons/circle-check";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import UserPlus from "lucide-react-native/icons/user-plus";
+import LogOut from "lucide-react-native/icons/log-out";
 import { colors as c, fonts, s } from "./theme";
 import { Action, IconButton } from "./ui";
 import { Sheet } from "./Sheet";

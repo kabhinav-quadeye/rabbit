@@ -23,11 +23,13 @@ export const tones: Record<string, { bg: string; ink: string }> = {
   blue: { bg: colors.blue, ink: "#4F6C89" },
   sand: { bg: colors.sand, ink: "#8E7839" },
 };
+const fontFamily = (name: string) =>
+  Platform.OS === "web" ? `${name}, sans-serif` : name;
 export const fonts = {
-  regular: "DMSans_400Regular",
-  medium: "DMSans_500Medium",
-  semibold: "DMSans_600SemiBold",
-  bold: "DMSans_700Bold",
+  regular: fontFamily("DMSans_400Regular"),
+  medium: fontFamily("DMSans_500Medium"),
+  semibold: fontFamily("DMSans_600SemiBold"),
+  bold: fontFamily("DMSans_700Bold"),
 };
 export const s = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center" },

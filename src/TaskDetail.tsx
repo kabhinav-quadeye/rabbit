@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, TextInput, Platform } from "react-native";
-import { CalendarDays, ChevronRight, X } from "lucide-react-native";
+import CalendarDays from "lucide-react-native/icons/calendar-days";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import X from "lucide-react-native/icons/x";
 import { colors as c, fonts, s } from "./theme";
 import { Action, Chip, IconButton } from "./ui";
 import {

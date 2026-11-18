@@ -1,21 +1,19 @@
 import React, { useRef, useState } from "react";
 import { View, Text, Pressable, TextInput, Platform } from "react-native";
-import {
-  Footprints,
-  BookOpen,
-  Leaf,
-  Languages,
-  Flag,
-  Heart,
-  Check,
-  Plus,
-  Send,
-  SignalHigh,
-  SignalMedium,
-  SignalLow,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react-native";
+import Footprints from "lucide-react-native/icons/footprints";
+import BookOpen from "lucide-react-native/icons/book-open";
+import Leaf from "lucide-react-native/icons/leaf";
+import Languages from "lucide-react-native/icons/languages";
+import Flag from "lucide-react-native/icons/flag";
+import Heart from "lucide-react-native/icons/heart";
+import Check from "lucide-react-native/icons/check";
+import Plus from "lucide-react-native/icons/plus";
+import Send from "lucide-react-native/icons/send";
+import SignalHigh from "lucide-react-native/icons/signal-high";
+import SignalMedium from "lucide-react-native/icons/signal-medium";
+import SignalLow from "lucide-react-native/icons/signal-low";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { colors as c, tones, fonts, s } from "./theme";
 import { Action, IconButton } from "./ui";
 import { Sheet } from "./Sheet";

@@ -59,8 +59,17 @@ test("Alex uses normal password sign-in, sees seeded components, and stays signe
   await expect(
     page.getByText("That reading list we talked about", { exact: true }),
   ).toBeVisible();
+  // Returning readers with initialized profiles can open Home without a
+  // transaction. Keep this endpoint unavailable during relaunch.
+  const commit = /firestore\.googleapis\.com.*documents:commit/;
+  await page.route(commit, (route) => route.abort());
   await page.reload();
-  await expect(page.getByRole("textbox", { name: "Post title" })).toBeVisible();
+  await expect(
+    page.getByText("The best design decision is sometimes subtraction.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.unroute(commit);
   await page.getByRole("button", { name: "Profile", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Edit profile" }),
