@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { KeyRound, LockKeyhole } from "lucide-react-native";
+import { Copy, KeyRound, LockKeyhole } from "lucide-react-native";
+import * as Clipboard from "expo-clipboard";
 import { agentEndpoint, request } from "./api";
 import type { AgentProposal } from "./agent";
 import { Sheet } from "./Sheet";
@@ -21,6 +22,22 @@ export function AgentAccess({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(
+    null,
+  );
+  const setupPrompt =
+    agentEndpoint && connection?.token
+      ? [
+          "Please connect my Rabbit account to your MCP client. Add a server named rabbit using the settings below.",
+          "",
+          `URL: ${agentEndpoint}`,
+          "Transport: Streamable HTTP",
+          `Authorization: Bearer ${connection.token}`,
+          "",
+          "Set Authorization as an HTTP request header. Use your client's secret storage for the key if available and keep it out of logs, replies, and shared files.",
+          "Connect and run tools/list to verify that the Rabbit tools are available.",
+        ].join("\n")
+      : null;
 
   async function refresh() {
     const [access, pending] = await Promise.all([
@@ -49,6 +66,17 @@ export function AgentAccess({
   useEffect(() => {
     void run("refresh", refresh);
   }, []);
+
+  async function copySetup(prompt: string) {
+    try {
+      const copied = await Clipboard.setStringAsync(prompt, {
+        android: { isSensitive: true },
+      });
+      setCopyStatus(copied ? "copied" : "failed");
+    } catch {
+      setCopyStatus("failed");
+    }
+  }
 
   async function review(proposal: AgentProposal, approve: boolean) {
     await request(
@@ -106,23 +134,55 @@ export function AgentAccess({
                 {connection.token}
               </Text>
               <Text style={s.small}>
-                Save this key now. In your MCP client, set the Authorization
-                header to Bearer followed by a space and this key.
+                The setup prompt includes this key. Paste it into a private
+                conversation with the agent you want to connect.
               </Text>
-              <Action
-                secondary
-                onPress={() =>
-                  setConnection({ expiresAt: connection.expiresAt })
-                }
-              >
-                Hide key
-              </Action>
+              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                {setupPrompt && (
+                  <Action
+                    icon={Copy}
+                    disabled={!!busy}
+                    onPress={() =>
+                      void run("copy", () => copySetup(setupPrompt))
+                    }
+                  >
+                    Copy setup prompt
+                  </Action>
+                )}
+                <Action
+                  secondary
+                  disabled={!!busy}
+                  onPress={() => {
+                    setConnection({ expiresAt: connection.expiresAt });
+                    setCopyStatus(null);
+                  }}
+                >
+                  Hide key
+                </Action>
+              </View>
+              {copyStatus === "copied" && (
+                <Text accessibilityLiveRegion="polite" style={s.small}>
+                  Setup prompt copied.
+                </Text>
+              )}
+              {copyStatus === "failed" && (
+                <>
+                  <Text accessibilityRole="alert" style={s.error}>
+                    Couldn’t access the clipboard. Select and copy the prompt
+                    below.
+                  </Text>
+                  <Text selectable style={s.small}>
+                    {setupPrompt}
+                  </Text>
+                </>
+              )}
             </View>
           )}
           {connection && (
             <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
               <Action
                 icon={KeyRound}
+                secondary={!!setupPrompt}
                 loading={busy === "key"}
                 disabled={!!busy}
                 onPress={() =>
@@ -130,6 +190,7 @@ export function AgentAccess({
                     setConnection(
                       await request<Connection>("/agent/connection", "POST"),
                     );
+                    setCopyStatus(null);
                   })
                 }
               >
