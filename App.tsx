@@ -60,6 +60,7 @@ import {
   Field,
   Privacy,
 } from "./src/ui";
+import { AgentAccess } from "./src/AgentAccess";
 import { Composer } from "./src/Composer";
 import { PostCard, PostDetail } from "./src/Posts";
 import { Friends } from "./src/Friends";
@@ -68,6 +69,7 @@ import { Auth } from "./src/Auth";
 import { GoalsScreen } from "./src/GoalsScreen";
 import { usePwaInstall } from "./src/usePwaInstall";
 import {
+  agentEndpoint,
   request,
   restoreToken,
   setToken,
@@ -141,6 +143,7 @@ function Rabbit() {
     [bio, setBio] = useState(""),
     [profileError, setProfileError] = useState(""),
     [profileBusy, setProfileBusy] = useState(false);
+  const [agentAccessOpen, setAgentAccessOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   async function refresh() {
@@ -1469,6 +1472,21 @@ function Rabbit() {
                               </Text>
                             </Pressable>
                           </View>
+                          {agentEndpoint && (
+                            <Action
+                              secondary
+                              style={{ alignSelf: "flex-start" }}
+                              onPress={() => setAgentAccessOpen(true)}
+                            >
+                              Agent access
+                            </Action>
+                          )}
+                          {agentAccessOpen && (
+                            <AgentAccess
+                              onClose={() => setAgentAccessOpen(false)}
+                              onApprove={refresh}
+                            />
+                          )}
                           {profileMode === "friends" ? (
                             <Friends
                               key={user.id}

@@ -27,6 +27,9 @@ async function start(
       method,
       headers: {
         "Content-Type": "application/json",
+        ...(path === "/mcp"
+          ? { Accept: "application/json, text/event-stream" }
+          : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -539,5 +542,98 @@ test("comments, saves and useful votes persist across SQLite restart and stay sc
   } finally {
     await app.stop();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("agent tools queue private proposals and only the account owner can approve them", async () => {
+  const app = await start();
+  try {
+    const alice = (await app.call("/auth/register", "POST", account("Alice")))
+      .data;
+    const bob = (await app.call("/auth/register", "POST", account("Bob"))).data;
+    const connection = await app.call(
+      "/agent/connection",
+      "POST",
+      {},
+      alice.token,
+    );
+    assert.equal(connection.status, 201);
+    const key = connection.data.token;
+    const privatePost = await app.call(
+      "/posts",
+      "POST",
+      { title: "Private to Bob", body: "Personal", audienceType: "self" },
+      bob.token,
+    );
+    assert.equal(privatePost.status, 201);
+
+    const callTool = (name: string, args: object) =>
+      app.call(
+        "/mcp",
+        "POST",
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name, arguments: args },
+        },
+        key,
+      );
+    assert.equal((await app.call("/posts", "POST", {}, key)).status, 401);
+    const foreign = await callTool("search_posts", { query: "Private to Bob" });
+    assert.deepEqual(foreign.data.result.structuredContent.posts, []);
+    const draft = await callTool("create_post_draft", {
+      title: "Review this",
+      body: "A new note",
+    });
+    assert.equal(draft.status, 200);
+    assert.equal(draft.data.result.isError, undefined);
+    assert.equal(
+      (await callTool("suggest_goal", { title: "Read more" })).data.result
+        .isError,
+      undefined,
+    );
+    const pending = (
+      await app.call("/agent/proposals", "GET", undefined, alice.token)
+    ).data;
+    assert.equal(pending.length, 2);
+    const path = `/agent/proposals/${pending.find((p: any) => p.kind === "post").id}`;
+    assert.deepEqual(
+      (await app.call("/agent/proposals", "GET", undefined, bob.token)).data,
+      [],
+    );
+    assert.equal((await app.call(path, "POST", {}, bob.token)).status, 404);
+    assert.equal((await app.call(path, "POST", {}, key)).status, 401);
+    assert.deepEqual(
+      (await app.call("/search?q=Review", "GET", undefined, alice.token)).data,
+      [],
+    );
+    assert.equal((await app.call(path, "POST", {}, alice.token)).status, 201);
+    assert.equal((await app.call(path, "POST", {}, alice.token)).status, 404);
+    assert.equal(
+      (await callTool("search_posts", { query: "Review" })).data.result
+        .structuredContent.posts.length,
+      1,
+    );
+    assert.equal(
+      (
+        await app.call(
+          `/agent/proposals/${pending.find((p: any) => p.kind === "goal").id}`,
+          "POST",
+          {},
+          alice.token,
+        )
+      ).status,
+      201,
+    );
+    assert.equal(
+      (await callTool("list_goals", {})).data.result.structuredContent.goals
+        .length,
+      1,
+    );
+    await app.call("/agent/connection", "DELETE", undefined, alice.token);
+    assert.equal((await callTool("list_goals", {})).status, 401);
+  } finally {
+    await app.stop();
   }
 });

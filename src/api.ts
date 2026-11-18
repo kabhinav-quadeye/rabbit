@@ -8,6 +8,11 @@ const nativeHost = Constants.expoConfig?.hostUri?.split(":")[0] ?? "localhost";
 const base =
   process.env.EXPO_PUBLIC_API_URL ??
   (Platform.OS === "web" ? "" : `http://${nativeHost}:3001`);
+const gateway = firebaseService ? process.env.EXPO_PUBLIC_AGENT_URL : base;
+export const agentEndpoint =
+  gateway === undefined
+    ? null
+    : `${gateway.replace(/\/$/, "") || globalThis.location?.origin || ""}/api/mcp`;
 let token: string | null = null;
 export async function setToken(next: string | null) {
   if (firebaseAuth) return;
@@ -36,14 +41,22 @@ export async function request<T = unknown>(
   method = "GET",
   input?: unknown,
 ): Promise<T> {
-  if (firebaseService) return firebaseService.request<T>(path, method, input);
+  const connection = path === "/agent/connection";
+  if (firebaseService && !connection)
+    return firebaseService.request<T>(path, method, input);
+  const bearer = firebaseAuth
+    ? await firebaseAuth.currentUser?.getIdToken()
+    : token;
+  const host = connection ? gateway : base;
+  if (host === undefined) throw new Error("Agent access isn’t configured.");
+
   let response: Response;
   try {
-    response = await fetch(`${base}/api${path}`, {
+    response = await fetch(`${host.replace(/\/$/, "")}/api${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
       },
       body: input === undefined ? undefined : JSON.stringify(input),
     });

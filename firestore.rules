@@ -2,6 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function agent() { return signedIn() && request.auth.token.get('rabbitAgent', false) == true; }
+    function person() { return signedIn() && !agent(); }
+    match /agentProposals/{proposalId} {
+      allow get: if person() && (!exists(/databases/$(database)/documents/agentProposals/$(proposalId)) || resource.data.ownerId == me());
+      allow list: if signedIn() && resource.data.ownerId == me();
+      allow create: if agent() && request.resource.data.ownerId == me()
+        && request.resource.data.id == proposalId
+        && request.resource.data.keys().hasOnly(['id', 'ownerId', 'kind', 'title', 'description', 'createdAt'])
+        && stamp(request.resource.data.createdAt)
+        && ((request.resource.data.kind == 'post' && text(request.resource.data.title, 180) && text(request.resource.data.description, 20000))
+          || (request.resource.data.kind == 'goal' && text(request.resource.data.title, 120) && text(request.resource.data.description, 500)))
+        && request.resource.data.title.size() > 0;
+      allow delete: if person() && resource.data.ownerId == me();
+    }
     function me() { return request.auth.uid; }
     function member(groupId) {
       return signedIn() && me() in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
@@ -23,15 +37,15 @@ service cloud.firestore {
     }
     match /users/{uid} {
       allow read: if signedIn();
-      allow create: if signedIn() && me() == uid && validUser(request.resource.data, uid);
-      allow update: if signedIn() && me() == uid && validUser(request.resource.data, uid)
+      allow create: if person() && me() == uid && validUser(request.resource.data, uid);
+      allow update: if person() && me() == uid && validUser(request.resource.data, uid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'bio', 'avatar', 'color']);
-      allow delete: if signedIn() && me() == uid;
+      allow delete: if person() && me() == uid;
     }
     match /usernames/{handle} {
       allow get: if true;
       allow list: if signedIn();
-      allow create: if signedIn() && request.resource.data.keys().hasOnly(['userId'])
+      allow create: if person() && request.resource.data.keys().hasOnly(['userId'])
         && request.resource.data.userId == me()
         && getAfter(/databases/$(database)/documents/users/$(me())).data.handle == handle;
     }
@@ -55,10 +69,10 @@ service cloud.firestore {
       allow get: if signedIn() && (!exists(/databases/$(database)/documents/friendRequests/$(requestId))
         || me() in [resource.data.senderId, resource.data.recipientId]);
       allow list: if signedIn() && (resource.data.senderId == me() || resource.data.recipientId == me());
-      allow create: if signedIn() && validRequest(request.resource.data, requestId)
+      allow create: if person() && validRequest(request.resource.data, requestId)
         && request.resource.data.senderId == me() && request.resource.data.status == 'pending'
         && noReverse(request.resource.data);
-      allow update: if signedIn() && validRequest(request.resource.data, requestId)
+      allow update: if person() && validRequest(request.resource.data, requestId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && ((resource.data.status == 'pending' && resource.data.recipientId == me()
             && (request.resource.data.status == 'declined'
@@ -79,8 +93,8 @@ service cloud.firestore {
     match /friendLists/{uid} {
       allow get: if signedIn() && (me() == uid
         || get(/databases/$(database)/documents/friendRequests/$(uid + ':' + me())).data.status == 'pending');
-      allow create: if signedIn() && validFriendList(uid, []);
-      allow update: if signedIn() && validFriendList(uid, resource.data.ids);
+      allow create: if person() && validFriendList(uid, []);
+      allow update: if person() && validFriendList(uid, resource.data.ids);
     }
     function onlyFriends(ids) {
       return ids.hasOnly([me()])
@@ -99,15 +113,15 @@ service cloud.firestore {
     }
     match /groups/{groupId} {
       allow read: if signedIn() && me() in resource.data.memberIds;
-      allow create: if signedIn() && request.resource.data.ownerId == me()
+      allow create: if person() && request.resource.data.ownerId == me()
         && me() in request.resource.data.memberIds && validGroup(request.resource.data, groupId)
         && onlyFriends(request.resource.data.memberIds.toSet());
-      allow update: if signedIn() && me() in resource.data.memberIds
+      allow update: if person() && me() in resource.data.memberIds
         && validGroup(request.resource.data, groupId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
         && request.resource.data.memberIds.hasAll(resource.data.memberIds)
         && onlyFriends(request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()));
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if person() && resource.data.ownerId == me();
     }
     function validPost(post, postId) {
       return post.keys().hasAll(['id', 'authorId', 'audienceType', 'audienceId', 'title', 'body', 'tags', 'type', 'createdAt', 'votes', 'savedBy', 'comments'])
@@ -135,7 +149,7 @@ service cloud.firestore {
     }
     match /posts/{postId} {
       allow read: if canRead(resource.data);
-      allow create: if signedIn() && request.resource.data.authorId == me()
+      allow create: if person() && request.resource.data.authorId == me()
         && validPost(request.resource.data, postId)
         && request.resource.data.votes.size() == 0
         && request.resource.data.savedBy.size() == 0
@@ -144,7 +158,7 @@ service cloud.firestore {
         && ((request.resource.data.audienceType == 'self' && request.resource.data.audienceId == me())
           || (request.resource.data.audienceType == 'user' && exists(/databases/$(database)/documents/users/$(request.resource.data.audienceId)))
           || (request.resource.data.audienceType == 'group' && member(request.resource.data.audienceId)));
-      allow update: if canRead(resource.data) && validPost(request.resource.data, postId)
+      allow update: if person() && canRead(resource.data) && validPost(request.resource.data, postId)
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
             && ownToggle(resource.data.votes, request.resource.data.votes))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['savedBy'])
@@ -153,7 +167,7 @@ service cloud.firestore {
             && ownToggle(resource.data.get('outdatedBy', []), request.resource.data.get('outdatedBy', [])))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
             && newComment(resource.data.comments, request.resource.data.comments)));
-      allow delete: if signedIn() && resource.data.authorId == me();
+      allow delete: if person() && resource.data.authorId == me();
     }
     // Goals are private to their members: the owner plus anyone they share
     // with. Goals from before sharing have no memberIds and belong to their
@@ -197,12 +211,12 @@ service cloud.firestore {
     }
     match /goals/{goalId} {
       allow read: if signedIn() && inGoal(resource.data);
-      allow create: if signedIn() && request.resource.data.ownerId == me()
+      allow create: if person() && request.resource.data.ownerId == me()
         && validGoal(request.resource.data, goalId)
         && onlyFriends(goalMemberIds(request.resource.data).toSet());
-      allow update: if signedIn() && validGoal(request.resource.data, goalId)
+      allow update: if person() && validGoal(request.resource.data, goalId)
         && (goalSettingsEdit() || goalMembersEdit());
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if person() && resource.data.ownerId == me();
     }
     function validTask(t, taskId) {
       return t.keys().hasAll(['id', 'ownerId', 'goalId', 'parentId', 'depth', 'description', 'notes', 'priority', 'dueDate', 'status', 'createdAt', 'updatedAt', 'completedAt'])
@@ -234,19 +248,19 @@ service cloud.firestore {
     }
     match /goalTasks/{taskId} {
       allow read: if signedIn() && taskMember(resource.data);
-      allow create: if signedIn() && validTask(request.resource.data, taskId)
+      allow create: if person() && validTask(request.resource.data, taskId)
         && request.resource.data.status == 'open'
         && request.resource.data.get('completedBy', null) == null
         && newTaskInGoal(request.resource.data)
         && (request.resource.data.parentId == null
           ? request.resource.data.depth == 0
           : validParent(request.resource.data));
-      allow update: if signedIn() && taskMember(resource.data)
+      allow update: if person() && taskMember(resource.data)
         && validTask(request.resource.data, taskId)
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['description', 'notes', 'priority', 'dueDate', 'status', 'updatedAt', 'completedAt', 'completedBy'])
         && validCompleter(resource.data, request.resource.data);
-      allow delete: if signedIn() && taskMember(resource.data);
+      allow delete: if person() && taskMember(resource.data);
     }
   }
 }

@@ -13,6 +13,10 @@ import { resolve, extname, sep } from "node:path";
 import { AppError, createService } from "./domain.ts";
 import { loginEmail } from "../src/identity.ts";
 import { seedState } from "./seed.ts";
+import { approveAgentProposal, makeAgentProposal } from "../src/agent.ts";
+import type { FirebaseOptions } from "firebase/app";
+import { createFirebaseAgent } from "./firebase-agent.ts";
+import { handleMcp } from "./mcp.ts";
 import type { State } from "../src/types.ts";
 
 type Options = {
@@ -20,14 +24,25 @@ type Options = {
   seed?: boolean;
   demoEnabled?: boolean;
   staticDir?: string;
+  firebaseAgentConfig?: FirebaseOptions;
 };
 export function createApi(options: Options = {}) {
+  const firebaseAgent =
+    options.firebaseAgentConfig &&
+    createFirebaseAgent(options.firebaseAgentConfig);
+  const agentNamespace = firebaseAgent
+    ? `firebase:${options.firebaseAgentConfig!.projectId}:`
+    : "local:";
   const demoEnabled =
-    options.demoEnabled ??
-    (process.env.NODE_ENV !== "production" && process.env.DEMO_MODE !== "0");
+    !firebaseAgent &&
+    (options.demoEnabled ??
+      (process.env.NODE_ENV !== "production" && process.env.DEMO_MODE !== "0"));
   const db = new DatabaseSync(options.dbPath ?? "data/rabbit.sqlite");
   db.exec(
     `PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS credentials (email TEXT PRIMARY KEY, user_id TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires INTEGER NOT NULL);`,
+  );
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS agent_keys (user_id TEXT PRIMARY KEY, hash TEXT UNIQUE NOT NULL, expires INTEGER NOT NULL)",
   );
   const row = db.prepare("SELECT data FROM app_state WHERE id=1").get() as
     { data: string } | undefined;
@@ -37,10 +52,10 @@ export function createApi(options: Options = {}) {
       ? { users: [], groups: [], posts: [] }
       : seedState();
   const save = (next: State) => {
-    state = next;
     db.prepare(
       "INSERT INTO app_state(id,data) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
     ).run(JSON.stringify(next));
+    state = next;
   };
   save(state);
   let service = createService(state, save);
@@ -107,6 +122,51 @@ export function createApi(options: Options = {}) {
       res.end(JSON.stringify(data));
     };
     try {
+      if (path === "/api/mcp") {
+        if (req.headers.origin)
+          throw new AppError(
+            "Browser origins are not supported on this endpoint.",
+            403,
+          );
+        const input = req.method === "POST" ? await body(req) : undefined;
+        const token = req.headers.authorization?.match(
+          /^Bearer (rabbit_[a-f0-9]{64})$/,
+        )?.[1];
+        const entry =
+          token &&
+          (db
+            .prepare(
+              "SELECT user_id FROM agent_keys WHERE hash=? AND expires>?",
+            )
+            .get(digest(token), Date.now()) as { user_id: string } | undefined);
+        if (!entry || !entry.user_id.startsWith(agentNamespace)) {
+          res.setHeader("WWW-Authenticate", "Bearer");
+          throw new AppError("Supply an active Rabbit agent key.", 401);
+        }
+        const id = entry.user_id.slice(agentNamespace.length);
+        await handleMcp(
+          req,
+          res,
+          input,
+          firebaseAgent?.actions(id) ?? {
+            search: (query) => service.search(id, query),
+            goals: () => service.goalsOverview(id),
+            propose: (kind, args) => {
+              const proposals = state.agentProposals ?? [];
+              if (proposals.filter((p) => p.ownerId === id).length >= 50)
+                throw new AppError(
+                  "Review some proposals before adding more.",
+                  409,
+                );
+              const proposal = makeAgentProposal(randomUUID(), id, kind, args);
+              save({ ...state, agentProposals: [...proposals, proposal] });
+              service = createService(state, save);
+              return proposal;
+            },
+          },
+        );
+        return;
+      }
       if (!path.startsWith("/api/")) {
         if (!options.staticDir) throw new AppError("Not found.", 404);
         const root = resolve(options.staticDir);
@@ -135,6 +195,38 @@ export function createApi(options: Options = {}) {
         send({ ok: true, demo: demoEnabled });
         return;
       }
+      if (path === "/api/agent/connection") {
+        const uid = firebaseAgent
+          ? await firebaseAgent.authenticate(req.headers.authorization)
+          : auth(req);
+        const id = agentNamespace + uid;
+        if (req.method === "GET") {
+          const key = db
+            .prepare(
+              "SELECT expires FROM agent_keys WHERE user_id=? AND expires>?",
+            )
+            .get(id, Date.now()) as { expires: number } | undefined;
+          send({ expiresAt: key ? new Date(key.expires).toISOString() : null });
+          return;
+        }
+        if (req.method === "POST") {
+          const token = `rabbit_${randomBytes(32).toString("hex")}`;
+          const expires = Date.now() + 30 * 86400000;
+          db.prepare("INSERT OR REPLACE INTO agent_keys VALUES(?,?,?)").run(
+            id,
+            digest(token),
+            expires,
+          );
+          send({ token, expiresAt: new Date(expires).toISOString() }, 201);
+          return;
+        }
+        if (req.method === "DELETE") {
+          db.prepare("DELETE FROM agent_keys WHERE user_id=?").run(id);
+          send({ expiresAt: null });
+          return;
+        }
+      }
+      if (firebaseAgent) throw new AppError("Not found.", 404);
       if (path === "/api/auth/demo" && req.method === "POST") {
         if (!demoEnabled || !state.users.some((u) => u.id === "alex"))
           throw new AppError("Not found.", 404);
@@ -249,6 +341,33 @@ export function createApi(options: Options = {}) {
         return;
       }
       const id = auth(req);
+      if (path === "/api/agent/proposals" && req.method === "GET") {
+        send(
+          (state.agentProposals ?? [])
+            .filter((p) => p.ownerId === id)
+            .reverse(),
+        );
+        return;
+      }
+      const review = path.match(/^\/api\/agent\/proposals\/([a-zA-Z0-9-]+)$/);
+      if (review && (req.method === "POST" || req.method === "DELETE")) {
+        const proposals = state.agentProposals ?? [];
+        const proposal = proposals.find(
+          (p) => p.id === review[1] && p.ownerId === id,
+        );
+        if (!proposal) throw new AppError("Proposal not found.", 404);
+        const next = {
+          ...state,
+          agentProposals: proposals.filter((p) => p.id !== proposal.id),
+        };
+        const result =
+          req.method === "POST"
+            ? approveAgentProposal(createService(next, save), id, proposal)
+            : (save(next), { ok: true });
+        service = createService(state, save);
+        send(result, req.method === "POST" ? 201 : 200);
+        return;
+      }
       if (path === "/api/auth/logout" && req.method === "POST") {
         db.prepare("DELETE FROM sessions WHERE hash=?").run(
           digest(req.headers.authorization!.replace(/^Bearer /, "")),
@@ -392,5 +511,11 @@ export function createApi(options: Options = {}) {
       }
     }
   });
-  return { server, close: () => db.close() };
+  return {
+    server,
+    close: () => {
+      db.close();
+      return firebaseAgent?.close();
+    },
+  };
 }

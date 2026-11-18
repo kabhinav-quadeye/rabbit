@@ -112,3 +112,23 @@ SQLite is used by one local API process; its data is separate from Firebase. Nat
 - `PRODUCT.md`, `DESIGN.md`, `.impeccable/`: product and design records.
 
 Local credentials/configuration, databases, generated exports, and test evidence are gitignored. Email verification, password reset, account deletion UI, and moderation remain future work.
+
+## Connect an agent
+
+In Rabbit, open **Profile → Agent access** and select **Create key**. The key is shown once and expires after 30 days. Replacing or revoking it disables the existing key. Use a client that accepts Streamable HTTP and custom headers. Set the server URL shown in Rabbit and the header `Authorization: Bearer <agent key>`. Keep the key in your client's secret storage. Use HTTPS outside local development.
+
+Rabbit exposes four MCP tools.
+
+| Tool | What it does |
+| --- | --- |
+| `search_posts` | Searches posts the account can already see, with ten results per page. Pass `nextOffset` as `offset` to retrieve more. |
+| `list_goals` | Lists the account's own and shared goals and their tasks. |
+| `create_post_draft` | Queues a text note for review. |
+| `suggest_goal` | Queues a goal and an optional reason for review. |
+
+In **Profile → Agent access**, select **Refresh proposals** to load new items. Approve a proposal to create a private post or goal, or dismiss it to remove it from the queue.
+
+### Hosting
+
+- **SQLite:** Run the existing Rabbit server. The MCP endpoint is `/api/mcp` on the same server. Keep the SQLite file on persistent storage so keys and proposals survive a restart.
+- **Firebase:** Run the Rabbit Node server as a gateway with `RABBIT_FIREBASE_AGENT=1`, the same `EXPO_PUBLIC_FIREBASE_PROJECT_ID` and `EXPO_PUBLIC_FIREBASE_API_KEY` as the app, and Firebase Admin Application Default Credentials. The gateway identity needs permission to look up Auth users, verify revocation, and sign custom tokens (for a service account using IAM signing, grant it `iam.serviceAccounts.signBlob` on the signing account). Deploy the repository's Firestore rules to the same project through your normal release process. Set `EXPO_PUBLIC_AGENT_URL` to the gateway origin when building the app. The gateway stores key hashes in its SQLite file, so give it persistent storage and one running instance. Firestore stores proposals and enforces the scoped agent identity's permissions.

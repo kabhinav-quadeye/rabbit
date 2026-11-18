@@ -102,6 +102,7 @@ export type State = {
   friendRequests?: FriendRequest[];
   goals?: Goal[];
   goalTasks?: GoalTask[];
+  agentProposals?: import("./agent.ts").AgentProposal[];
 };
 export type Bootstrap = State & {
   currentUser: User;

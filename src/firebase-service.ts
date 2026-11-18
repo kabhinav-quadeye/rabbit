@@ -10,6 +10,7 @@ import {
   collection,
   doc,
   getDocs,
+  limit,
   getDoc,
   query,
   where,
@@ -21,7 +22,12 @@ import {
   writeBatch,
   type Firestore,
 } from "firebase/firestore";
-import { createService } from "./domain.ts";
+import {
+  makeAgentProposal,
+  approveAgentProposal,
+  type AgentProposal,
+} from "./agent.ts";
+import { AppError, createService } from "./domain.ts";
 import { loginEmail } from "./identity.ts";
 import type {
   State,
@@ -99,9 +105,9 @@ export function createFirebaseService(
       tx.set(ref, user);
     });
   }
-  async function load(): Promise<Bootstrap> {
+  async function load(ensure = true): Promise<Bootstrap> {
     const uid = id();
-    await ensureProfile();
+    if (ensure) await ensureProfile();
     const [users, groups, sent, received] = await Promise.all([
       getDocs(collection(db, "users")),
       getDocs(
@@ -273,6 +279,60 @@ export function createFirebaseService(
         else batch.delete(doc(db, w.target.name, w.target.id));
       await batch.commit();
     }
+  }
+  function proposalQuery(uid: string) {
+    return query(collection(db, "agentProposals"), where("ownerId", "==", uid));
+  }
+  async function queueAgentProposal(
+    kind: AgentProposal["kind"],
+    input: { title: string; body?: string; why?: string },
+  ) {
+    const uid = id();
+    const ref = doc(collection(db, "agentProposals"));
+    const proposal = makeAgentProposal(ref.id, uid, kind, input);
+    const pending = await getDocs(query(proposalQuery(uid), limit(50)));
+    if (pending.size >= 50)
+      throw new AppError("Review some proposals before adding more.", 409);
+    await setDoc(ref, proposal);
+    return proposal;
+  }
+  async function reviewProposal(
+    uid: string,
+    proposalId: string,
+    method: string,
+  ) {
+    const ref = doc(db, "agentProposals", proposalId);
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const proposal = snap.data() as AgentProposal | undefined;
+      if (!proposal || proposal.ownerId !== uid)
+        throw new AppError("Proposal not found.", 404);
+      if (method === "DELETE") {
+        tx.delete(ref);
+        return { ok: true };
+      }
+      const state =
+        proposal.kind === "goal"
+          ? await goalState(uid, null)
+          : {
+              users: [
+                (await tx.get(doc(db, "users", uid))).data() as User,
+              ].filter(Boolean),
+              groups: [],
+              posts: [],
+            };
+      const result = approveAgentProposal(
+        createService(state, undefined, newId),
+        uid,
+        proposal,
+      );
+      tx.set(
+        doc(db, proposal.kind === "post" ? "posts" : "goals", result.id),
+        clean(result),
+      );
+      tx.delete(ref);
+      return result;
+    });
   }
   async function goals(uid: string, path: string, method: string, input: any) {
     const service = (state: State) => createService(state, undefined, newId);
@@ -458,10 +518,19 @@ export function createFirebaseService(
     }
     const uid = id();
     if (path === "/bootstrap" && method === "GET") return load();
+    if (path === "/agent/proposals" && method === "GET") {
+      const list = await getDocs(proposalQuery(uid));
+      return list.docs
+        .map((d) => d.data() as AgentProposal)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+    const review = path.match(/^\/agent\/proposals\/([a-zA-Z0-9-]+)$/);
+    if (review && (method === "POST" || method === "DELETE"))
+      return reviewProposal(uid, review[1], method);
     if (/^\/(goals|tasks)(\/|$)/.test(path))
       return goals(uid, path, method, input);
     const url = new URL(path, "https://rabbit.local");
-    const state = await load();
+    const state = await load(url.pathname !== "/search");
     const service = createService(state, undefined, newId);
     if (url.pathname === "/users" && method === "GET")
       return service.findUsers(uid, url.searchParams.get("q") ?? "");
@@ -601,6 +670,7 @@ export function createFirebaseService(
     throw new Error("Not found.");
   }
   return {
+    queueAgentProposal,
     async request<T = unknown>(
       path: string,
       method = "GET",
