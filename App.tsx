@@ -36,6 +36,7 @@ import {
   Grid2X2,
   X,
   LogOut,
+  Download,
   SlidersHorizontal,
   ArrowLeft,
   Check,
@@ -65,6 +66,7 @@ import { Friends } from "./src/Friends";
 import { Circles, GroupForm } from "./src/Groups";
 import { Auth } from "./src/Auth";
 import { GoalsScreen } from "./src/GoalsScreen";
+import { usePwaInstall } from "./src/usePwaInstall";
 import {
   request,
   restoreToken,
@@ -111,6 +113,7 @@ export default function App() {
   );
 }
 function Rabbit() {
+  const pwa = usePwaInstall();
   const { width } = useWindowDimensions();
   const desktop = width >= 960,
     wide = width >= 1230;
@@ -1263,20 +1266,45 @@ function Rabbit() {
                                   </View>
                                 </View>
                                 {!editing && (
-                                  <Action
-                                    label="Edit profile"
-                                    secondary
-                                    style={{ minHeight: 48 }}
-                                    onPress={() => {
-                                      setProfileName(user.name);
-                                      setBio(user.bio ?? "");
-                                      setEditing(true);
-                                    }}
+                                  <View
+                                    style={[
+                                      s.row,
+                                      { gap: 8, flexWrap: "wrap" },
+                                    ]}
                                   >
-                                    Edit profile
-                                  </Action>
+                                    <Action
+                                      label="Edit profile"
+                                      secondary
+                                      style={{ minHeight: 48 }}
+                                      onPress={() => {
+                                        setProfileName(user.name);
+                                        setBio(user.bio ?? "");
+                                        setEditing(true);
+                                      }}
+                                    >
+                                      Edit profile
+                                    </Action>
+                                    {pwa.canInstall && (
+                                      <Action
+                                        secondary
+                                        icon={Download}
+                                        onPress={pwa.install}
+                                        style={{ paddingHorizontal: 12 }}
+                                      >
+                                        Install Rabbit
+                                      </Action>
+                                    )}
+                                  </View>
                                 )}
                               </View>
+                              {!editing && !!pwa.message && (
+                                <Text
+                                  accessibilityLiveRegion="polite"
+                                  style={s.text}
+                                >
+                                  {pwa.message}
+                                </Text>
+                              )}
                               {editing ? (
                                 <View style={{ gap: 18 }}>
                                   <Field

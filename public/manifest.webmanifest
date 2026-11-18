@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "Rabbit",
+  "short_name": "Rabbit",
+  "description": "Your private corner.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8F9F4",
+  "theme_color": "#2F5843",
+  "icons": [
+    { "src": "/rabbit-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/rabbit-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
