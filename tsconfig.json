@@ -6,7 +6,8 @@
       "@/*": ["./*"]
     },
     "types": ["node", "react"],
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "exclude": [
     "node_modules",
