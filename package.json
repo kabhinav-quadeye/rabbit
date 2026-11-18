@@ -19,7 +19,7 @@
     "expo-speech-recognition": "^58.0.1",
     "expo-status-bar": "~58.0.4",
     "firebase": "^13.1.0",
-    "firebase-admin": "^14.5.1",
+    "firebase-admin": "^13.10.0",
     "lucide-react-native": "^1.65.0",
     "react": "19.3.0",
     "react-aria": "^3.53.1",
