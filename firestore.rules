@@ -4,6 +4,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function agent() { return signedIn() && request.auth.token.get('rabbitAgent', false) == true; }
     function person() { return signedIn() && !agent(); }
+    match /agentKeys/{uid} {
+      allow read, write: if false;
+    }
     match /agentProposals/{proposalId} {
       allow get: if person() && (!exists(/databases/$(database)/documents/agentProposals/$(proposalId)) || resource.data.ownerId == me());
       allow list: if signedIn() && resource.data.ownerId == me();

@@ -6,7 +6,6 @@ import {
   randomUUID,
   scryptSync,
   timingSafeEqual,
-  createHash,
 } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
@@ -16,7 +15,12 @@ import { seedState } from "./seed.ts";
 import { approveAgentProposal, makeAgentProposal } from "../src/agent.ts";
 import type { FirebaseOptions } from "firebase/app";
 import { createFirebaseAgent } from "./firebase-agent.ts";
-import { handleMcp } from "./mcp.ts";
+import {
+  digest,
+  readJsonBody as body,
+  serveAgent,
+  type AgentKeyStore,
+} from "./agent-api.ts";
 import type { State } from "../src/types.ts";
 
 type Options = {
@@ -30,9 +34,6 @@ export function createApi(options: Options = {}) {
   const firebaseAgent =
     options.firebaseAgentConfig &&
     createFirebaseAgent(options.firebaseAgentConfig);
-  const agentNamespace = firebaseAgent
-    ? `firebase:${options.firebaseAgentConfig!.projectId}:`
-    : "local:";
   const demoEnabled =
     !firebaseAgent &&
     (options.demoEnabled ??
@@ -59,8 +60,33 @@ export function createApi(options: Options = {}) {
   };
   save(state);
   let service = createService(state, save);
-  const digest = (token: string) =>
-    createHash("sha256").update(token).digest("hex");
+  const localKeys: AgentKeyStore = {
+    expires(uid) {
+      return (
+        db
+          .prepare("SELECT expires FROM agent_keys WHERE user_id=?")
+          .get(`local:${uid}`) as { expires: number } | undefined
+      )?.expires;
+    },
+    replace(uid, hash, expires) {
+      db.prepare("INSERT OR REPLACE INTO agent_keys VALUES(?,?,?)").run(
+        `local:${uid}`,
+        hash,
+        expires,
+      );
+    },
+    revoke(uid) {
+      db.prepare("DELETE FROM agent_keys WHERE user_id=?").run(`local:${uid}`);
+    },
+    owner(hash) {
+      const row = db
+        .prepare("SELECT user_id FROM agent_keys WHERE hash=? AND expires>?")
+        .get(hash, Date.now()) as { user_id: string } | undefined;
+      return row?.user_id.startsWith("local:")
+        ? row.user_id.slice(6)
+        : undefined;
+    },
+  };
   const session = (id: string) => {
     const token = randomBytes(32).toString("hex");
     db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(
@@ -78,22 +104,6 @@ export function createApi(options: Options = {}) {
     if (!entry)
       throw new AppError("Your session has ended. Please sign in again.", 401);
     return entry.user_id;
-  };
-  const body = async (req: IncomingMessage) => {
-    let value = "";
-    for await (const chunk of req) {
-      value += chunk;
-      if (Buffer.byteLength(value) > 65536)
-        throw new AppError("This post is too large.", 413);
-    }
-    try {
-      const result = JSON.parse(value || "{}");
-      if (!result || typeof result !== "object" || Array.isArray(result))
-        throw 0;
-      return result;
-    } catch {
-      throw new AppError("Send a valid JSON object.");
-    }
   };
   const attempts = new Map<string, { count: number; until: number }>();
   const server = createServer(async (req, res) => {
@@ -122,48 +132,37 @@ export function createApi(options: Options = {}) {
       res.end(JSON.stringify(data));
     };
     try {
-      if (path === "/api/mcp") {
-        if (req.headers.origin)
-          throw new AppError(
-            "Browser origins are not supported on this endpoint.",
-            403,
-          );
-        const input = req.method === "POST" ? await body(req) : undefined;
-        const token = req.headers.authorization?.match(
-          /^Bearer (rabbit_[a-f0-9]{64})$/,
-        )?.[1];
-        const entry =
-          token &&
-          (db
-            .prepare(
-              "SELECT user_id FROM agent_keys WHERE hash=? AND expires>?",
-            )
-            .get(digest(token), Date.now()) as { user_id: string } | undefined);
-        if (!entry || !entry.user_id.startsWith(agentNamespace)) {
-          res.setHeader("WWW-Authenticate", "Bearer");
-          throw new AppError("Supply an active Rabbit agent key.", 401);
-        }
-        const id = entry.user_id.slice(agentNamespace.length);
-        await handleMcp(
+      if (path === "/api/mcp" || path === "/api/agent/connection") {
+        await serveAgent(
           req,
           res,
-          input,
-          firebaseAgent?.actions(id) ?? {
-            search: (query) => service.search(id, query),
-            goals: () => service.goalsOverview(id),
-            propose: (kind, args) => {
-              const proposals = state.agentProposals ?? [];
-              if (proposals.filter((p) => p.ownerId === id).length >= 50)
-                throw new AppError(
-                  "Review some proposals before adding more.",
-                  409,
+          path === "/api/mcp" ? "mcp" : "connection",
+          firebaseAgent?.keys ?? localKeys,
+          firebaseAgent
+            ? (req) => firebaseAgent.authenticate(req.headers.authorization)
+            : auth,
+          firebaseAgent?.actions ??
+            ((id) => ({
+              search: (query) => service.search(id, query),
+              goals: () => service.goalsOverview(id),
+              propose: (kind, args) => {
+                const proposals = state.agentProposals ?? [];
+                if (proposals.filter((p) => p.ownerId === id).length >= 50)
+                  throw new AppError(
+                    "Review some proposals before adding more.",
+                    409,
+                  );
+                const proposal = makeAgentProposal(
+                  randomUUID(),
+                  id,
+                  kind,
+                  args,
                 );
-              const proposal = makeAgentProposal(randomUUID(), id, kind, args);
-              save({ ...state, agentProposals: [...proposals, proposal] });
-              service = createService(state, save);
-              return proposal;
-            },
-          },
+                save({ ...state, agentProposals: [...proposals, proposal] });
+                service = createService(state, save);
+                return proposal;
+              },
+            })),
         );
         return;
       }
@@ -194,37 +193,6 @@ export function createApi(options: Options = {}) {
       if (path === "/api/health" && req.method === "GET") {
         send({ ok: true, demo: demoEnabled });
         return;
-      }
-      if (path === "/api/agent/connection") {
-        const uid = firebaseAgent
-          ? await firebaseAgent.authenticate(req.headers.authorization)
-          : auth(req);
-        const id = agentNamespace + uid;
-        if (req.method === "GET") {
-          const key = db
-            .prepare(
-              "SELECT expires FROM agent_keys WHERE user_id=? AND expires>?",
-            )
-            .get(id, Date.now()) as { expires: number } | undefined;
-          send({ expiresAt: key ? new Date(key.expires).toISOString() : null });
-          return;
-        }
-        if (req.method === "POST") {
-          const token = `rabbit_${randomBytes(32).toString("hex")}`;
-          const expires = Date.now() + 30 * 86400000;
-          db.prepare("INSERT OR REPLACE INTO agent_keys VALUES(?,?,?)").run(
-            id,
-            digest(token),
-            expires,
-          );
-          send({ token, expiresAt: new Date(expires).toISOString() }, 201);
-          return;
-        }
-        if (req.method === "DELETE") {
-          db.prepare("DELETE FROM agent_keys WHERE user_id=?").run(id);
-          send({ expiresAt: null });
-          return;
-        }
       }
       if (firebaseAgent) throw new AppError("Not found.", 404);
       if (path === "/api/auth/demo" && req.method === "POST") {

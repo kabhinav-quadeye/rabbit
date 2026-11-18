@@ -1,7 +1,10 @@
 import {
+  cert,
   deleteApp as deleteAdmin,
   initializeApp as initializeAdmin,
 } from "firebase-admin/app";
+import { getFirestore as adminFirestore } from "firebase-admin/firestore";
+import type { AgentKeyStore } from "./agent-api.ts";
 import { getAuth as adminAuth } from "firebase-admin/auth";
 import { deleteApp, initializeApp, type FirebaseOptions } from "firebase/app";
 import {
@@ -14,13 +17,43 @@ import { createFirebaseService } from "../src/firebase-service.ts";
 import { AppError } from "./domain.ts";
 import type { AgentTools } from "./mcp.ts";
 
-export function createFirebaseAgent(config: FirebaseOptions) {
+export function createFirebaseAgent(
+  config: FirebaseOptions,
+  credentials?: string,
+) {
+  const account = credentials ? JSON.parse(credentials) : undefined;
+  if (account && account.project_id !== config.projectId)
+    throw new Error("The Firebase credential belongs to a different project.");
   const admin = initializeAdmin(
-    { projectId: config.projectId },
+    {
+      projectId: config.projectId,
+      ...(account ? { credential: cert(account) } : {}),
+    },
     crypto.randomUUID(),
   );
   const auth = adminAuth(admin);
+  const collection = adminFirestore(admin).collection("agentKeys");
+  const keys: AgentKeyStore = {
+    async expires(uid) {
+      return (await collection.doc(uid).get()).data()?.expires;
+    },
+    replace(uid, hash, expires) {
+      return collection.doc(uid).set({ hash, expires });
+    },
+    revoke(uid) {
+      return collection.doc(uid).delete();
+    },
+    async owner(hash) {
+      const snapshot = await collection
+        .where("hash", "==", hash)
+        .limit(1)
+        .get();
+      const key = snapshot.docs[0];
+      return key && key.data().expires > Date.now() ? key.id : undefined;
+    },
+  };
   return {
+    keys,
     close: () => deleteAdmin(admin),
     async authenticate(authorization?: string) {
       try {

@@ -55,12 +55,25 @@ test(
       demoEnabled: false,
       firebaseAgentConfig: config,
     });
+    const second = createApi({
+      dbPath: ":memory:",
+      firebaseAgentConfig: config,
+    });
+    second.server.listen(0, "127.0.0.1");
+    await once(second.server, "listening");
+    const secondPort = (second.server.address() as { port: number }).port;
     app.server.listen(0, "127.0.0.1");
     await once(app.server, "listening");
     const port = (app.server.address() as { port: number }).port;
-    const call = (path: string, bearer: string, data: object) =>
-      fetch(`http://127.0.0.1:${port}/api${path}`, {
-        method: "POST",
+    const call = (
+      path: string,
+      bearer: string,
+      data?: object,
+      method = "POST",
+      onPort = port,
+    ) =>
+      fetch(`http://127.0.0.1:${onPort}/api${path}`, {
+        method,
         headers: {
           Authorization: `Bearer ${bearer}`,
           "Content-Type": "application/json",
@@ -85,13 +98,34 @@ test(
       const connection = await call("/agent/connection", token, {});
       assert.equal(connection.status, 201);
       const key = (await connection.json()).token;
+      const status = await call(
+        "/agent/connection",
+        token,
+        undefined,
+        "GET",
+        secondPort,
+      );
+      assert.ok(
+        (await status.json()).expiresAt,
+        "A second instance sees the same connection",
+      );
+      await assert.rejects(
+        setDoc(doc(dbs[0], "agentKeys", uid), { hash: "spoof" }),
+        /permission/i,
+      );
       const tool = (name: string, args: object) =>
-        call("/mcp", key, {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/call",
-          params: { name, arguments: args },
-        }).then((r) => r.json());
+        call(
+          "/mcp",
+          key,
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/call",
+            params: { name, arguments: args },
+          },
+          "POST",
+          secondPort,
+        ).then((r) => r.json());
       assert.equal(
         (await tool("list_goals", {})).result.structuredContent.goals[0].id,
         goal.id,
@@ -160,7 +194,15 @@ test(
         "POST",
       );
       assert.deepEqual(approved.memberIds, [uid]);
+      await call("/agent/connection", token, undefined, "DELETE");
+      assert.equal(
+        (await call("/mcp", key, {}, "POST", secondPort)).status,
+        401,
+      );
     } finally {
+      second.server.close();
+      await once(second.server, "close");
+      await second.close();
       app.server.close();
       await once(app.server, "close");
       await app.close();

@@ -49,3 +49,4 @@ yarn-error.*
 /.impeccable/review/
 /dist-native/
 .gstack/
+.vercel
