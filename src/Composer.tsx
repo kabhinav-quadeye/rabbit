@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
@@ -43,6 +43,13 @@ export function Composer({
     [error, setError] = useState(""),
     [ready, setReady] = useState(false);
   const [dictating, setDictating] = useState(false);
+  const [draftVersion, setDraftVersion] = useState(0);
+  const titleInput = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const opening = body.trim().split(/\n|(?<=[.!?])\s/, 1)[0] ?? "";
+  const suggestedTitle = opening
+    .slice(0, 80)
+    .replace(opening.length > 80 ? /\s+\S*$/ : /[.!?]+$/, "")
+    .trim();
   const key = `rabbit.draft.${data.currentUser.id}`;
   useEffect(() => {
     let alive = true;
@@ -122,6 +129,7 @@ export function Composer({
       setTags("");
       setUrl("");
       setShowTags(false);
+      setDraftVersion((version) => version + 1);
       await AsyncStorage.removeItem(key);
     } catch (e) {
       setError((e as Error).message);
@@ -136,11 +144,9 @@ export function Composer({
           <View style={[s.row, { gap: 10 }]}>
             <Avatar user={data.currentUser} size={36} />
             <View>
-              <Text style={[s.label, { fontSize: 13 }]}>
-                {data.currentUser.name}
-              </Text>
+              <Text style={s.label}>New post</Text>
               <Text style={[s.small, { fontSize: 11 }]}>
-                A thought worth keeping
+                {data.currentUser.name}
               </Text>
             </View>
           </View>
@@ -154,7 +160,7 @@ export function Composer({
                 gap: 7,
                 borderRadius: 7,
                 paddingHorizontal: 10,
-                minHeight: 36,
+                minHeight: 48,
                 maxWidth: 240,
                 backgroundColor: tone.bg,
                 opacity: hovered ? 0.85 : 1,
@@ -176,7 +182,12 @@ export function Composer({
             <ChevronDown size={13} color={tone.ink} />
           </Pressable>
         </View>
-        <View style={[s.row, { gap: 8, marginTop: 22, marginBottom: 9 }]}>
+        <View
+          style={[
+            s.row,
+            { gap: 6, flexWrap: "wrap", marginTop: 16, marginBottom: 4 },
+          ]}
+        >
           {(
             [
               { id: "note", label: "Note", icon: FileText },
@@ -192,14 +203,19 @@ export function Composer({
                 setType(t.id);
                 setError("");
               }}
-              style={[
+              style={({ hovered, pressed }: any) => [
                 s.row,
                 {
                   gap: 6,
                   paddingHorizontal: 11,
-                  minHeight: 34,
+                  minHeight: 48,
                   borderRadius: 6,
-                  backgroundColor: type === t.id ? "#F0F3E9" : "transparent",
+                  backgroundColor:
+                    type === t.id
+                      ? c.greenLight
+                      : hovered || pressed
+                        ? c.bg
+                        : "transparent",
                 },
               ]}
             >
@@ -221,69 +237,46 @@ export function Composer({
           ))}
         </View>
         <TextInput
+          ref={titleInput}
           accessibilityLabel="Post title"
           placeholder={
-            type === "question"
-              ? "What are you curious about?"
-              : "Give your thought a title…"
+            type === "question" ? "What are you curious about?" : "Add a title"
           }
           placeholderTextColor={c.muted}
           value={title}
           onChangeText={setTitle}
           maxLength={180}
-          style={
-            {
-              fontFamily: fonts.medium,
-              fontSize: 23,
-              letterSpacing: -0.6,
-              color: c.ink,
-              paddingVertical: 10,
-              minHeight: 52,
-              outlineStyle: "none",
-            } as any
-          }
-        />
-        <Textarea
           style={{
-            borderWidth: 0,
-            minHeight: 138,
-            height: 138,
-            backgroundColor: "transparent",
+            fontFamily: fonts.medium,
+            fontSize: 23,
+            letterSpacing: -0.6,
+            color: c.ink,
+            paddingVertical: 10,
+            minHeight: 52,
           }}
-        >
-          <TextareaInput
-            accessibilityLabel="Post content"
-            aria-label="Post content"
-            placeholder={
-              "Something you learned. A link worth keeping.\nA question for your circle."
-            }
-            placeholderTextColor={c.muted}
-            value={body}
-            onChangeText={setBody}
-            maxLength={20000}
-            style={{
-              fontFamily: fonts.regular,
-              padding: 0,
-              fontSize: 14,
-              lineHeight: 24,
-              textAlignVertical: "top",
-              color: c.ink,
-            }}
-          />
-        </Textarea>
-        <VoiceInput
-          disabled={busy || !ready}
-          full={body.length >= 20000}
-          onActiveChange={setDictating}
-          onText={(text) =>
-            setBody((previous) =>
-              `${previous}${previous && !/\s$/.test(previous) ? " " : ""}${text}`.slice(
-                0,
-                20000,
-              ),
-            )
-          }
         />
+        {!title.trim() && !!suggestedTitle && !dictating && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setTitle(suggestedTitle);
+              titleInput.current?.focus();
+            }}
+            style={({ hovered, pressed }: any) => [
+              s.row,
+              {
+                minHeight: 48,
+                alignSelf: "flex-start",
+                borderRadius: 7,
+                opacity: hovered || pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <Text style={[s.label, { color: c.green }]}>
+              Use opening words as title
+            </Text>
+          </Pressable>
+        )}
         {type === "link" && (
           <View
             style={[
@@ -316,6 +309,58 @@ export function Composer({
             />
           </View>
         )}
+        <View
+          style={{ paddingTop: 8, borderTopWidth: 1, borderColor: c.border }}
+        >
+          <VoiceInput
+            key={draftVersion}
+            disabled={busy || !ready}
+            full={body.length >= 20000}
+            onActiveChange={setDictating}
+            onText={(text) =>
+              setBody((previous) =>
+                `${previous}${previous && !/\s$/.test(previous) ? " " : ""}${text}`.slice(
+                  0,
+                  20000,
+                ),
+              )
+            }
+          />
+          <Textarea
+            style={{
+              borderWidth: 0,
+              minHeight: 112,
+              height: 112,
+              backgroundColor: "transparent",
+            }}
+          >
+            <TextareaInput
+              accessibilityLabel="Post content"
+              aria-label="Post content"
+              placeholder={
+                dictating
+                  ? "Your draft will appear here."
+                  : type === "question"
+                    ? "Add context for your question…"
+                    : type === "link"
+                      ? "What’s worth noting about this link?"
+                      : "What would you like to remember?"
+              }
+              placeholderTextColor={c.muted}
+              value={body}
+              onChangeText={setBody}
+              maxLength={20000}
+              style={{
+                fontFamily: fonts.regular,
+                padding: 0,
+                fontSize: 14,
+                lineHeight: 24,
+                textAlignVertical: "top",
+                color: c.ink,
+              }}
+            />
+          </Textarea>
+        </View>
         {showTags ? (
           <View style={[s.row, { gap: 6, paddingBottom: 16 }]}>
             <Hash size={15} color={c.muted} />
@@ -332,7 +377,7 @@ export function Composer({
                 fontFamily: fonts.regular,
                 fontSize: 13,
                 color: c.ink,
-                minHeight: 34,
+                minHeight: 48,
               }}
             />
           </View>
@@ -345,8 +390,8 @@ export function Composer({
               {
                 gap: 6,
                 alignSelf: "flex-start",
-                minHeight: 38,
-                marginBottom: 10,
+                minHeight: 48,
+                marginBottom: 6,
               },
             ]}
           >
@@ -393,7 +438,7 @@ export function Composer({
             !title.trim() ||
             (type === "link" && !url.trim())
           }
-          style={{ minHeight: 40, paddingHorizontal: 22 }}
+          style={{ minHeight: 48, paddingHorizontal: 22 }}
         >
           Post
         </Action>

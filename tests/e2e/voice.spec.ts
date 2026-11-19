@@ -98,6 +98,7 @@ for (const width of [360, 1440]) {
     await expect(page.getByText("A useful", { exact: true })).toBeVisible();
     await emit(page, "result", "A useful thought.");
     await expect(body).toHaveValue("Typed first. A useful thought.");
+    await emit(page, "speechstart");
     await emit(page, "result", "Another", false);
     await page.screenshot({
       path: `.impeccable/review/listening-${width}.png`,
@@ -154,6 +155,70 @@ for (const width of [360, 1440]) {
   });
 }
 
+test.describe("English dictation", () => {
+  test.use({ locale: "fr-FR" });
+
+  test("a non-English device can dictate a post in English", async ({
+    page,
+  }) => {
+    await speech(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Dictate post content" }).click();
+    expect(await page.evaluate(() => (window as any).recognition.lang)).toBe(
+      "en-US",
+    );
+  });
+});
+
+test("the voice panel responds to speech and waits for final text when audio ends", async ({
+  page,
+}) => {
+  await speech(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Dictate post content" }).click();
+  const status = page.getByRole("status").filter({ hasText: "Listening" });
+  await expect(status).toHaveText("Listening…");
+  await emit(page, "speechstart");
+  await expect(
+    status.getByText("Speech detected", { exact: true }),
+  ).toBeVisible();
+  await emit(page, "speechend");
+  await expect(status).toHaveText("Listening…");
+  await emit(page, "audioend");
+  await expect(
+    page.getByText("Finishing dictation…", { exact: true }),
+  ).toBeVisible();
+  await emit(page, "result", "Words after the mic closes.");
+  await emit(page, "end");
+  await expect(page.getByRole("textbox", { name: "Post content" })).toHaveValue(
+    "Words after the mic closes.",
+  );
+});
+
+test("a dictated draft can use its opening words as an editable title", async ({
+  page,
+}) => {
+  await speech(page);
+  await page.goto("/");
+  const title = page.getByRole("textbox", { name: "Post title" });
+  await page.getByRole("button", { name: "Dictate post content" }).click();
+  await emit(page, "result", "Water the seedlings. Check the soil first.");
+  await emit(page, "end");
+  await expect(title).toHaveValue("");
+  await page
+    .getByRole("button", { name: "Use opening words as title" })
+    .click();
+  await expect(title).toHaveValue("Water the seedlings");
+  await expect(title).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Post content" })).toHaveValue(
+    "Water the seedlings. Check the soil first.",
+  );
+  await title.fill("Seedling care");
+  await expect(
+    page.getByRole("button", { name: "Publish post" }),
+  ).toBeEnabled();
+});
+
 test("recognition errors preserve the draft and allow keyboard retry", async ({
   page,
 }) => {
@@ -178,6 +243,26 @@ test("recognition errors preserve the draft and allow keyboard retry", async ({
   await emit(page, "end");
   await expect(body).toHaveValue("Keep my draft. Recovered.");
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("publishing a dictated draft clears voice feedback for the next post", async ({
+  page,
+}) => {
+  await speech(page);
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "Post title" }).fill("Seedling care");
+  await page.getByRole("button", { name: "Dictate post content" }).click();
+  await emit(page, "result", "Water the seedlings.");
+  await emit(page, "end");
+  const feedback = page
+    .getByRole("status")
+    .filter({ hasText: "Dictation added" });
+  await expect(feedback).toBeVisible();
+  await page.getByRole("button", { name: "Publish post" }).click();
+  await expect(page.getByRole("textbox", { name: "Post content" })).toHaveValue(
+    "",
+  );
+  await expect(feedback).toHaveCount(0);
 });
 
 test("unsupported recognition keeps typing and publishing available", async ({
