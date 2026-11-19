@@ -14,7 +14,11 @@ import { speech } from "./speech";
 import { colors as c, fonts, s } from "./theme";
 
 type Phase = "idle" | "starting" | "listening" | "stopping";
-const sessionSeconds = 60;
+const noResultsMs = 30_000;
+const startTimeoutMs = 15_000;
+const finishTimeoutMs = 5_000;
+const timedOut =
+  "Dictation stopped responding. Your draft is safe. Tap Dictate to try again.";
 const barHeights = [
   8, 14, 20, 14, 27, 34, 22, 38, 48, 31, 41, 30, 22, 31, 20, 13, 18, 12, 8,
 ];
@@ -24,7 +28,7 @@ function errorMessage(code: string) {
   switch (code) {
     case "not-allowed":
     case "service-not-allowed":
-      return "Allow microphone and speech recognition in your browser or device settings, then try again. You can also keep typing.";
+      return "Allow microphone and speech recognition in your browser or device settings, or use the microphone on your keyboard if available.";
     case "network":
       return "Dictation lost its connection. Check your connection and try again. Your draft is safe.";
     case "no-speech":
@@ -58,14 +62,41 @@ export function VoiceInput({
   const [elapsed, setElapsed] = useState(0);
   const [message, setMessage] = useState("");
   const current = useRef<Phase>("idle");
+  const deadline = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const alive = useRef(true);
   const received = useRef(false);
   const failed = useRef(false);
+  const stoppedForInactivity = useRef(false);
   const callbacks = useRef({ onText, onActiveChange });
   callbacks.current = { onText, onActiveChange };
 
+  function scheduleDeadline(next: Phase) {
+    clearTimeout(deadline.current);
+    if (next === "idle") return;
+    deadline.current = setTimeout(
+      () => {
+        if (next === "listening") {
+          stoppedForInactivity.current = true;
+          stop();
+        } else {
+          if (!failed.current) setError(timedOut);
+          interrupt("");
+        }
+      },
+      next === "listening"
+        ? noResultsMs
+        : next === "starting"
+          ? startTimeoutMs
+          : finishTimeoutMs,
+    );
+  }
+
   function transition(next: Phase) {
+    if (next === current.current) return;
     current.current = next;
+    scheduleDeadline(next);
     setPhase(next);
     callbacks.current.onActiveChange(next !== "idle");
   }
@@ -101,15 +132,15 @@ export function VoiceInput({
               failed.current
             )
               return;
-            const text = event.results[0]?.transcript.trim();
+            const text = event.results[0]?.transcript.trim() ?? "";
+            if (!event.isFinal) setInterim(text);
             if (!text) return;
+            if (current.current === "listening") scheduleDeadline("listening");
             if (event.isFinal) {
               received.current = true;
               setInterim("");
               setLastPhrase(text);
               callbacks.current.onText(text);
-            } else {
-              setInterim(text);
             }
           }),
           speech.addListener("error", (event) => {
@@ -123,10 +154,15 @@ export function VoiceInput({
           speech.addListener("end", () => {
             if (!alive.current || current.current === "idle") return;
             setInterim("");
-            if (!failed.current && !received.current)
-              setError(errorMessage("no-speech"));
-            else if (!failed.current)
-              setMessage("Dictation added to your draft.");
+            if (!failed.current) {
+              if (stoppedForInactivity.current)
+                setMessage(
+                  "Dictation stopped after 30 seconds without new text. Tap Dictate to continue.",
+                );
+              else if (received.current)
+                setMessage("Dictation added to your draft.");
+              else setError(errorMessage("no-speech"));
+            }
             transition("idle");
           }),
         ]
@@ -155,6 +191,7 @@ export function VoiceInput({
       document.addEventListener("visibilitychange", hidden);
     return () => {
       alive.current = false;
+      clearTimeout(deadline.current);
       listeners.forEach((listener) => listener.remove());
       appState.remove();
       if (Platform.OS === "web")
@@ -170,29 +207,10 @@ export function VoiceInput({
       );
   }, [full]);
   useEffect(() => {
-    if (phase === "idle") return;
-    const timer = setTimeout(
-      () => {
-        if (phase === "listening") {
-          stop();
-        } else {
-          interrupt(
-            "Dictation timed out. Your draft is safe. Try again or keep typing.",
-          );
-        }
-      },
-      phase === "listening" ? sessionSeconds * 1000 : 15_000,
-    );
-    return () => clearTimeout(timer);
-  }, [phase]);
-  useEffect(() => {
     if (phase !== "listening") return;
     const started = Date.now();
     const timer = setInterval(
-      () =>
-        setElapsed(
-          Math.min(sessionSeconds, Math.floor((Date.now() - started) / 1000)),
-        ),
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
       1000,
     );
     return () => clearInterval(timer);
@@ -202,6 +220,7 @@ export function VoiceInput({
     if (!available || disabled || full || current.current !== "idle") return;
     received.current = false;
     failed.current = false;
+    stoppedForInactivity.current = false;
     setError("");
     setMessage("");
     setInterim("");

@@ -21,6 +21,7 @@ async function speech(page: Page, available = true) {
       }
       class Recognition extends EventTarget {
         start() {
+          (window as any).previousRecognition = (window as any).recognition;
           (window as any).recognition = this;
           this.dispatchEvent(new Event("start"));
         }
@@ -36,6 +37,7 @@ async function speech(page: Page, available = true) {
         type: string,
         transcript = "",
         final = true,
+        previous = false,
       ) => {
         const event = new Event(type);
         Object.assign(
@@ -53,7 +55,10 @@ async function speech(page: Page, available = true) {
               ? { error: transcript, message: transcript }
               : {},
         );
-        (window as any).recognition.dispatchEvent(event);
+        const target = previous
+          ? (window as any).previousRecognition
+          : (window as any).recognition;
+        target.dispatchEvent(event);
       };
     },
     { available },
@@ -65,6 +70,87 @@ async function emit(page: Page, type: string, text = "", final = true) {
     { type, text, final },
   );
 }
+
+test("dictation continues past one minute while results are arriving", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await speech(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Dictate post content" }).click();
+  const body = page.getByRole("textbox", { name: "Post content" });
+  for (const text of ["First phrase.", "Second phrase.", "Third phrase."]) {
+    await page.clock.fastForward(21_000);
+    await emit(page, "result", text);
+  }
+  await expect(page.getByRole("button", { name: "Stop dictation" })).toBeEnabled();
+  await expect(body).toHaveValue("First phrase. Second phrase. Third phrase.");
+});
+
+test("a silent recognizer releases the composer and preserves the draft", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await speech(page);
+  await page.goto("/");
+  const start = page.getByRole("button", { name: "Dictate post content" });
+  const body = page.getByRole("textbox", { name: "Post content" });
+  await start.click();
+  await emit(page, "result", "Keep this sentence.");
+  await page.clock.fastForward(31_000);
+  await expect(page.getByText("Finishing dictation…", { exact: true })).toBeVisible();
+  await page.clock.fastForward(6_000);
+  await expect(start).toBeEnabled();
+  await expect(page.getByRole("alert")).toContainText("Dictation stopped responding");
+  await expect(body).toHaveValue("Keep this sentence.");
+});
+
+test("late events from an aborted recognizer cannot change a new dictation", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await speech(page);
+  await page.goto("/");
+  const start = page.getByRole("button", { name: "Dictate post content" });
+  await start.click();
+  await page.getByRole("button", { name: "Stop dictation" }).click();
+  await page.clock.fastForward(16_000);
+  await start.click();
+  await page.evaluate(() => {
+    (window as any).emitSpeech("result", "Stale text.", true, true);
+    (window as any).emitSpeech("end", "", true, true);
+  });
+  await emit(page, "result", "Continuing now.");
+  await emit(page, "end");
+  await expect(page.getByRole("textbox", { name: "Post content" })).toHaveValue(
+    "Continuing now.",
+  );
+});
+
+test("dictation keeps every finalized phrase in a browser result batch", async ({
+  page,
+}) => {
+  await speech(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Dictate post content" }).click();
+  await emit(page, "result", "Earlier phrase.");
+  await page.evaluate(() => {
+    const results = [
+      ["Earlier phrase.", true],
+      ["First new phrase.", true],
+      ["Second new phrase.", true],
+      ["Still speaking", false],
+    ].map(([transcript, isFinal]) =>
+      Object.assign([{ transcript, confidence: 0.9 }], { isFinal }),
+    );
+    const event = Object.assign(new Event("result"), { resultIndex: 1, results });
+    (window as any).recognition.dispatchEvent(event);
+  });
+  await expect(page.getByRole("textbox", { name: "Post content" })).toHaveValue(
+    "Earlier phrase. First new phrase. Second new phrase.",
+  );
+  await expect(page.getByText("Still speaking", { exact: true })).toBeVisible();
+});
 
 for (const width of [360, 1440]) {
   test(`dictation appends reviewed text and publishes only on request at ${width}px`, async ({
