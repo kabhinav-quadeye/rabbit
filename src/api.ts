@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import type { Bootstrap, Post } from "./types";
+import { goalWebFetchPath } from "./goal-webfetch";
 import { firebaseAuth, firebaseService } from "./firebase";
 export { firebaseEnabled } from "./firebase";
 const nativeHost = Constants.expoConfig?.hostUri?.split(":")[0] ?? "localhost";
@@ -13,6 +14,10 @@ export const agentEndpoint =
   gateway === undefined
     ? null
     : `${gateway.replace(/\/$/, "") || globalThis.location?.origin || ""}/api/mcp`;
+const webFetchGateway =
+  gateway ?? (process.env.NODE_ENV === "production" ? "" : undefined);
+export const goalWebFetchAvailable =
+  Platform.OS === "web" && webFetchGateway !== undefined;
 let token: string | null = null;
 export async function setToken(next: string | null) {
   if (firebaseAuth) return;
@@ -42,12 +47,13 @@ export async function request<T = unknown>(
   input?: unknown,
 ): Promise<T> {
   const connection = path === "/agent/connection";
-  if (firebaseService && !connection)
+  const goalWebFetch = path === goalWebFetchPath;
+  if (firebaseService && !connection && !goalWebFetch)
     return firebaseService.request<T>(path, method, input);
   const bearer = firebaseAuth
     ? await firebaseAuth.currentUser?.getIdToken()
     : token;
-  const host = connection ? gateway : base;
+  const host = goalWebFetch ? webFetchGateway : connection ? gateway : base;
   if (host === undefined) throw new Error("Agent access isn’t configured.");
 
   let response: Response;

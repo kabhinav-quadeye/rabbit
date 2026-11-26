@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { AppError } from "./domain.ts";
+import {
+  goalTaskReviewPath,
+  parseGoalTaskSuggestion,
+  validWebFetchGoalId,
+} from "../src/goal-webfetch.ts";
 import { handleMcp, type AgentTools } from "./mcp.ts";
 
 type Result<T> = T | Promise<T>;
@@ -40,15 +45,119 @@ export function sendJson(res: ServerResponse, value: unknown, status = 200) {
   res.end(JSON.stringify(value));
 }
 
+const webFetchKeyPrefix = "webfetch:";
+export type AgentEndpoint = "mcp" | "connection" | "goals" | "goal-suggestions";
+
+async function serveGoalWebFetch(
+  req: IncomingMessage,
+  res: ServerResponse,
+  endpoint: "goals" | "goal-suggestions",
+  keys: AgentKeyStore,
+  authenticate: (req: IncomingMessage) => Result<string>,
+  actions: (uid: string) => AgentTools,
+) {
+  const query = new URL(req.url ?? "/", "http://localhost").searchParams;
+  const method = req.method;
+  const canManage = endpoint === "goals";
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  if (canManage && method === "OPTIONS") {
+    res
+      .writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      })
+      .end();
+    return;
+  }
+  if (canManage && (method === "POST" || method === "DELETE")) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const uid = await authenticate(req);
+    const keyId = webFetchKeyPrefix + uid;
+    if (method === "DELETE") {
+      await keys.revoke(keyId);
+      sendJson(res, { expiresAt: null });
+      return;
+    }
+    const { goalId } = await readJsonBody(req);
+    if (!validWebFetchGoalId(goalId))
+      throw new AppError("Choose a valid goal.");
+    await actions(uid).goal(goalId, false);
+    const token = `rg_${randomBytes(32).toString("hex")}`;
+    const expires = Date.now() + 15 * 60 * 1000;
+    await keys.replace(keyId, digest(`${goalId}:${token}`), expires);
+    sendJson(
+      res,
+      { goalId, token, expiresAt: new Date(expires).toISOString() },
+      201,
+    );
+    return;
+  }
+
+  if (method !== "GET") {
+    res.setHeader("Allow", canManage ? "GET, POST, DELETE, OPTIONS" : "GET");
+    throw new AppError("Method not allowed.", 405);
+  }
+  const goalId = query.get("goalId");
+  const token = query.get("token");
+  const keyId =
+    validWebFetchGoalId(goalId) && token && /^rg_[a-f0-9]{64}$/.test(token)
+      ? await keys.owner(digest(`${goalId}:${token}`))
+      : undefined;
+  if (!keyId?.startsWith(webFetchKeyPrefix) || !goalId)
+    throw new AppError("Supply an active WebFetch token for this goal.", 401);
+  const uid = keyId.slice(webFetchKeyPrefix.length);
+  if (endpoint === "goal-suggestions") {
+    const suggestion = parseGoalTaskSuggestion(query);
+    if (!suggestion) throw new AppError("Enter a task of 1–500 characters.");
+    await actions(uid).goal(goalId, false);
+    sendJson(res, { reviewPath: goalTaskReviewPath(suggestion) });
+    return;
+  }
+  const offset = Number(query.get("offset") ?? 0);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 500)
+    throw new AppError("Choose a task offset from 0 to 500.");
+  const { goal, tasks } = await actions(uid).goal(goalId, true);
+  tasks.sort(
+    (a, b) =>
+      a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  const end = offset + 10;
+  sendJson(res, {
+    goal: {
+      id: goal.id,
+      title: goal.title,
+      why: goal.why,
+      status: goal.status,
+    },
+    tasks: tasks
+      .slice(offset, end)
+      .map(({ id, parentId, description, priority, dueDate, status }) => ({
+        id,
+        parentId,
+        description,
+        priority,
+        dueDate,
+        status,
+      })),
+    nextOffset: end < tasks.length ? end : null,
+  });
+}
+
 export async function serveAgent(
   req: IncomingMessage,
   res: ServerResponse,
-  endpoint: "mcp" | "connection",
+  endpoint: AgentEndpoint,
   keys: AgentKeyStore,
   authenticate: (req: IncomingMessage) => Result<string>,
   actions: (uid: string) => AgentTools,
 ) {
   try {
+    if (endpoint === "goals" || endpoint === "goal-suggestions") {
+      await serveGoalWebFetch(req, res, endpoint, keys, authenticate, actions);
+      return;
+    }
     if (endpoint === "mcp") {
       if (req.headers.origin)
         throw new AppError(
@@ -63,7 +172,7 @@ export async function serveAgent(
         return;
       }
       const uid = token && (await keys.owner(digest(token)));
-      if (!uid) {
+      if (!uid || uid.startsWith(webFetchKeyPrefix)) {
         res.setHeader("WWW-Authenticate", "Bearer");
         throw new AppError("Supply an active Rabbit agent key.", 401);
       }

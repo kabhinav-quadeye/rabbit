@@ -98,6 +98,37 @@ test(
       const connection = await call("/agent/connection", token, {});
       assert.equal(connection.status, 201);
       const key = (await connection.json()).token;
+      const [existingTask] = await owner<{ id: string; description: string }[]>(
+        `/goals/${goal.id}/tasks`,
+        "POST",
+        { description: "Existing task" },
+      );
+      const webFetch = await call("/agent/goals", token, { goalId: goal.id });
+      assert.equal(webFetch.status, 201);
+      const webFetchKey = (await webFetch.json()).token;
+      const params = new URLSearchParams({
+        goalId: goal.id,
+        token: webFetchKey,
+      });
+      const readGoal = () =>
+        fetch(`http://127.0.0.1:${secondPort}/api/agent/goals?${params}`);
+      const read = await readGoal();
+      assert.equal(read.status, 200);
+      assert.equal(read.headers.get("cache-control"), "no-store");
+      assert.equal((await read.json()).tasks[0].id, existingTask.id);
+      const suggestion = await fetch(
+        `http://127.0.0.1:${secondPort}/api/agent/goal-suggestions?${params}&description=New+task`,
+      );
+      assert.equal(suggestion.status, 200);
+      assert.ok(!(await suggestion.json()).reviewPath.includes(webFetchKey));
+      assert.equal(
+        (await owner<{ tasks: unknown[] }>("/goals")).tasks.length,
+        1,
+      );
+      await assert.rejects(
+        setDoc(doc(dbs[0], "agentKeys", `webfetch:${uid}`), { hash: "spoof" }),
+        /permission/i,
+      );
       const status = await call(
         "/agent/connection",
         token,
@@ -149,6 +180,19 @@ test(
           .status,
         401,
       );
+      assert.equal(
+        (
+          await call("/agent/goals", await agent.user.getIdToken(), {
+            goalId: goal.id,
+          })
+        ).status,
+        401,
+      );
+      const [task] = (await owner<{ tasks: { id: string }[] }>("/goals")).tasks;
+      await assert.rejects(
+        setDoc(doc(dbs[1], "goalTasks", "bypass"), { ...task, id: "bypass" }),
+        /permission/i,
+      );
       await assert.rejects(
         setDoc(doc(dbs[1], "goals", "bypass"), { ...goal, id: "bypass" }),
         /permission/i,
@@ -194,6 +238,10 @@ test(
         "POST",
       );
       assert.deepEqual(approved.memberIds, [uid]);
+      await owner(`/goals/${goal.id}`, "DELETE");
+      assert.equal((await readGoal()).status, 404);
+      await call("/agent/goals", token, undefined, "DELETE");
+      assert.equal((await readGoal()).status, 401);
       await call("/agent/connection", token, undefined, "DELETE");
       assert.equal(
         (await call("/mcp", key, {}, "POST", secondPort)).status,

@@ -679,6 +679,24 @@ export function createFirebaseService(
   }
   return {
     queueAgentProposal,
+    async goalSnapshot(goalId: string, includeTasks: boolean) {
+      const uid = id();
+      const goal = await readGoal(goalId);
+      const tasks =
+        goal && includeTasks
+          ? await getDocs(
+              query(collection(db, "goalTasks"), where("goalId", "==", goalId)),
+            )
+          : null;
+      const state = {
+        users: [],
+        groups: [],
+        posts: [],
+        goals: goal ? [goal] : [],
+        goalTasks: tasks?.docs.map((doc) => doc.data() as GoalTask) ?? [],
+      };
+      return createService(state).goalSnapshot(uid, goalId, includeTasks);
+    },
     async request<T = unknown>(
       path: string,
       method = "GET",

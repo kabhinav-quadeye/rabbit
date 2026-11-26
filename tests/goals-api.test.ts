@@ -263,3 +263,102 @@ test("goal sharing routes let friends collaborate and leave", async () => {
     await app.stop();
   }
 });
+
+test("a WebFetch key can read and suggest a task for just one goal", async () => {
+  const app = await start();
+  try {
+    const alice = await app.register("Alice");
+    const eve = await app.register("Eve");
+    const makeGoal = async (title: string, user = alice) =>
+      (await app.call("/goals", "POST", { title }, user)).data.id as string;
+    const goal = await makeGoal("Learn Bengali");
+    const other = await makeGoal("Another private goal");
+    const foreign = await makeGoal("Eve's goal", eve);
+    const mint = (goalId: string) =>
+      app.call("/agent/goals", "POST", { goalId }, alice);
+    assert.equal((await mint(foreign)).status, 404);
+    const key = await mint(goal);
+    assert.equal(key.status, 201);
+    assert.match(key.data.token, /^rg_[0-9a-f]{64}$/);
+    const remaining = Date.parse(key.data.expiresAt) - Date.now();
+    assert.ok(remaining > 14 * 60 * 1000 && remaining <= 15 * 60 * 1000);
+    assert.equal((await app.call("/agent/goals")).status, 401);
+    assert.equal(
+      (await app.call("/agent/goals", "POST", { goalId: goal }, key.data.token))
+        .status,
+      401,
+    );
+    const params = new URLSearchParams({ goalId: goal, token: key.data.token });
+    const read = () => app.call(`/agent/goals?${params}`);
+    assert.deepEqual((await read()).data.goal, {
+      id: goal,
+      title: "Learn Bengali",
+      why: "",
+      status: "active",
+    });
+    const wrong = new URLSearchParams(params);
+    wrong.set("goalId", other);
+    assert.equal((await app.call(`/agent/goals?${wrong}`)).status, 401);
+    assert.equal(
+      (await app.call("/mcp", "POST", {}, key.data.token)).status,
+      401,
+    );
+    const suggest = (description: string, method = "GET") =>
+      app.call(
+        `/agent/goal-suggestions?${params}&description=${encodeURIComponent(description)}`,
+        method,
+      );
+    assert.equal((await suggest("   ")).status, 400);
+    assert.equal((await suggest("Find a tutor", "POST")).status, 405);
+    const draft = await suggest("Find a tutor");
+    assert.equal(draft.status, 200);
+    const review = new URL(draft.data.reviewPath, "https://rabbit.example");
+    assert.equal(review.origin, "https://rabbit.example");
+    assert.equal(review.pathname, "/");
+    assert.equal(review.search, "");
+    assert.ok(!review.href.includes(key.data.token));
+    assert.deepEqual(
+      Object.fromEntries(new URLSearchParams(review.hash.slice(1))),
+      { rabbitGoal: goal, suggestedTask: "Find a tutor" },
+    );
+    assert.deepEqual((await read()).data.tasks, []);
+    for (let n = 0; n < 11; n++) {
+      assert.equal(
+        (
+          await app.call(
+            `/goals/${goal}/tasks`,
+            "POST",
+            { description: `Task ${n}`, notes: "Private notes" },
+            alice,
+          )
+        ).status,
+        201,
+      );
+    }
+    const first = (await read()).data;
+    assert.equal(first.tasks.length, 10);
+    assert.equal(first.nextOffset, 10);
+    assert.ok(first.tasks.every((task: object) => !("notes" in task)));
+    params.set("offset", "10");
+    const last = (await read()).data;
+    assert.equal(last.tasks.length, 1);
+    assert.equal(last.nextOffset, null);
+    assert.ok(
+      first.tasks.every((task: { id: string }) => task.id !== last.tasks[0].id),
+    );
+
+    const replacement = await mint(other);
+    assert.equal(replacement.status, 201);
+    assert.equal((await read()).status, 401);
+    params.set("token", replacement.data.token);
+    params.set("goalId", other);
+    assert.equal((await read()).status, 200);
+    assert.equal(
+      (await app.call("/agent/goals", "DELETE", undefined, alice)).status,
+      200,
+    );
+    assert.equal((await read()).status, 401);
+  } finally {
+    await app.stop();
+  }
+});

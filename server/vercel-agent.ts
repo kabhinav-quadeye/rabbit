@@ -1,10 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createFirebaseAgent } from "./firebase-agent.ts";
-import { sendJson, serveAgent } from "./agent-api.ts";
+import { sendJson, serveAgent, type AgentEndpoint } from "./agent-api.ts";
 
 let gateway: ReturnType<typeof createFirebaseAgent> | undefined;
 
-export function vercelAgent(endpoint: "mcp" | "connection") {
+export function vercelAgent(endpoint: AgentEndpoint) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     if (!gateway) {
       const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;

@@ -10,6 +10,7 @@ import Trash from "lucide-react-native/icons/trash";
 import CircleCheck from "lucide-react-native/icons/circle-check";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import UserPlus from "lucide-react-native/icons/user-plus";
+import KeyRound from "lucide-react-native/icons/key-round";
 import LogOut from "lucide-react-native/icons/log-out";
 import { colors as c, fonts, s } from "./theme";
 import { Action, IconButton } from "./ui";
@@ -31,10 +32,18 @@ import {
 } from "./goals";
 import type { Goal, GoalTask } from "./types";
 import type { GoalsApi } from "./useGoals";
+import { goalWebFetchAvailable } from "./api";
 import { SharedWith, personName, type GoalPeople } from "./GoalPeople";
 
 export type GoalMenuAction =
-  "edit" | "reached" | "active" | "archive" | "delete" | "share" | "leave";
+  | "edit"
+  | "reached"
+  | "active"
+  | "archive"
+  | "delete"
+  | "share"
+  | "leave"
+  | "webfetch";
 
 /** "Done by Sam" when someone else completed a task in a shared goal. */
 export function doneBy(t: GoalTask, people?: GoalPeople) {
@@ -271,10 +280,22 @@ export function GoalPage({
     label: "Share goal",
     icon: UserPlus,
   };
+  const sharingOptions = [
+    share,
+    ...(goalWebFetchAvailable
+      ? [
+          {
+            action: "webfetch" as const,
+            label: "Share with WebFetch",
+            icon: KeyRound,
+          },
+        ]
+      : []),
+  ];
   const menuItems: { action: GoalMenuAction; label: string; icon: any }[] =
     owner
       ? [
-          share,
+          ...sharingOptions,
           { action: "edit", label: "Edit goal", icon: PencilLine },
           goal.status === "active"
             ? {
@@ -301,7 +322,10 @@ export function GoalPage({
             : []),
           { action: "delete", label: "Delete goal", icon: Trash },
         ]
-      : [share, { action: "leave", label: "Leave goal", icon: LogOut }];
+      : [
+          ...sharingOptions,
+          { action: "leave", label: "Leave goal", icon: LogOut },
+        ];
 
   return (
     <View style={{ gap: 18 }}>

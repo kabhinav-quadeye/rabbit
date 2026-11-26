@@ -60,6 +60,7 @@ import { PostCard, PostDetail } from "./src/Posts";
 import { Friends } from "./src/Friends";
 import { Circles, GroupForm } from "./src/Groups";
 import { Auth } from "./src/Auth";
+import { parseGoalTaskSuggestion } from "./src/goal-webfetch";
 import { GoalsScreen } from "./src/GoalsScreen";
 import { usePwaInstall } from "./src/usePwaInstall";
 import {
@@ -109,6 +110,15 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+function readGoalSuggestion() {
+  if (Platform.OS !== "web") return null;
+  return parseGoalTaskSuggestion(
+    new URLSearchParams(window.location.hash.slice(1)),
+    "rabbitGoal",
+    "suggestedTask",
+  );
+}
+
 function Rabbit() {
   const pwa = usePwaInstall();
   const { width } = useWindowDimensions();
@@ -118,7 +128,8 @@ function Rabbit() {
     [loading, setLoading] = useState(true),
     [bootError, setBootError] = useState(""),
     [demoEnabled, setDemoEnabled] = useState(false);
-  const [tab, setTab] = useState<Tab>("home"),
+  const [goalSuggestion, setGoalSuggestion] = useState(readGoalSuggestion);
+  const [tab, setTab] = useState<Tab>(goalSuggestion ? "goals" : "home"),
     [mode, setMode] = useState("post"),
     [destination, setDestination] = useState("self"),
     [selectedGroup, setSelectedGroup] = useState<string | null>(null),
@@ -182,6 +193,23 @@ function Rabbit() {
   useEffect(() => {
     boot();
   }, []);
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    function onHashChange() {
+      const next = readGoalSuggestion();
+      setGoalSuggestion(next);
+      if (next) navigate("goals");
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+  function dismissGoalSuggestion() {
+    setGoalSuggestion(null);
+    if (Platform.OS === "web") {
+      const { pathname, search } = window.location;
+      window.history.replaceState(window.history.state, "", pathname + search);
+    }
+  }
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4500);
@@ -289,7 +317,7 @@ function Rabbit() {
     await setToken(auth.token);
     await AsyncStorage.removeItem("rabbit.signedout");
     await refresh();
-    navigate("home");
+    navigate(goalSuggestion ? "goals" : "home");
   }
   async function signOut() {
     if (signingOut) return;
@@ -769,6 +797,8 @@ function Rabbit() {
                 wide={wide}
                 onToast={setToast}
                 onFindFriends={() => navigate("profile")}
+                suggestion={goalSuggestion}
+                onDismissSuggestion={dismissGoalSuggestion}
               />
             ) : (
               <ScrollView

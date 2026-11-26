@@ -23,6 +23,8 @@ import {
   TaskMeta,
 } from "./GoalParts";
 import { GoalPage, taskLabel, type GoalMenuAction } from "./GoalPage";
+import { GoalWebFetch, ReviewSuggestedTask } from "./GoalWebFetch";
+import type { GoalTaskSuggestion } from "./goal-webfetch";
 import { GoalForm } from "./GoalForm";
 import { TaskDetail, TaskTrail } from "./TaskDetail";
 import {
@@ -379,12 +381,16 @@ export function GoalsScreen({
   wide,
   onToast,
   onFindFriends,
+  suggestion,
+  onDismissSuggestion,
 }: {
   space: Bootstrap;
   desktop: boolean;
   wide: boolean;
   onToast: (message: string) => void;
   onFindFriends: () => void;
+  suggestion: GoalTaskSuggestion | null;
+  onDismissSuggestion: () => void;
 }) {
   const people = peopleOf(space);
   const api = useGoals(people.me);
@@ -400,12 +406,14 @@ export function GoalsScreen({
     [rowError, setRowError] = useState<Record<string, string>>({}),
     [showReached, setShowReached] = useState(false),
     [showArchived, setShowArchived] = useState(false),
-    [sharingId, setSharingId] = useState<string | null>(null);
+    [sharingId, setSharingId] = useState<string | null>(null),
+    [webFetchGoal, setWebFetchGoal] = useState<Goal | null>(null);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const phone = !desktop;
   const data = api.data;
   const goal = data?.goals.find((g) => g.id === goalId) ?? null;
   const task = data?.tasks.find((t) => t.id === taskId) ?? null;
+  const suggestionGoal = data?.goals.find((g) => g.id === suggestion?.goalId);
   const sharingGoal = data?.goals.find((g) => g.id === sharingId) ?? null;
   const taskGoal = task
     ? (data?.goals.find((g) => g.id === task.goalId) ?? null)
@@ -417,6 +425,10 @@ export function GoalsScreen({
   useEffect(() => {
     if (taskId && data && !task) setTaskId(null); // deleted elsewhere
   }, [taskId, data, task]);
+
+  useEffect(() => {
+    if (suggestion) setWebFetchGoal(null);
+  }, [suggestion]);
 
   function openGoal(id: string | null) {
     if (!id && goalId) api.resnapshot();
@@ -470,6 +482,7 @@ export function GoalsScreen({
   function goalMenu(g: Goal, action: GoalMenuAction) {
     if (action === "edit") return setForm(g);
     if (action === "share") return setSharingId(g.id);
+    if (action === "webfetch") return setWebFetchGoal(g);
     if (action === "leave")
       return setConfirm({
         title: "Leave this goal?",
@@ -902,6 +915,27 @@ export function GoalsScreen({
           onFindFriends={() => {
             setSharingId(null);
             onFindFriends();
+          }}
+        />
+      )}
+      {!suggestion && webFetchGoal && (
+        <GoalWebFetch
+          goal={webFetchGoal}
+          onClose={() => setWebFetchGoal(null)}
+        />
+      )}
+      {suggestion && data && (
+        <ReviewSuggestedTask
+          description={suggestion.description}
+          goal={suggestionGoal}
+          onClose={onDismissSuggestion}
+          onApply={async () => {
+            await api.createTask(suggestion.goalId, {
+              description: suggestion.description,
+            });
+            openGoal(suggestion.goalId);
+            onDismissSuggestion();
+            onToast("Suggested task added.");
           }}
         />
       )}

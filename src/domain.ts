@@ -378,6 +378,13 @@ export function createService(
         tasks: goalTasks.filter((t) => ids.has(t.goalId)),
       });
     },
+    goalSnapshot(id: string, goalId: string, includeTasks: boolean) {
+      const goal = memberGoal(id, goalId);
+      return structuredClone({
+        goal,
+        tasks: includeTasks ? goalTasks.filter((t) => t.goalId === goalId) : [],
+      });
+    },
     createGoal(id: string, input: GoalInput) {
       const title = text(input.title, "Goal title", 120);
       const memberIds = [id, ...memberList(input.memberIds)].filter(

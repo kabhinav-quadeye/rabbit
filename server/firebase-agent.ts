@@ -108,6 +108,8 @@ export function createFirebaseAgent(
             service.request(`/search?q=${encodeURIComponent(query)}`),
           ),
         goals: () => use((service) => service.request("/goals")),
+        goal: (goalId, includeTasks) =>
+          use((service) => service.goalSnapshot(goalId, includeTasks)),
         propose: (kind, input) =>
           use((service) => service.queueAgentProposal(kind, input)),
       };

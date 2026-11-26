@@ -37,13 +37,66 @@
         height: 100%;
         flex: 1;
       }
+      #root:empty {
+        display: none;
+      }
+      #root:not(:empty) + #rabbit-webfetch {
+        display: none;
+      }
+      body:has(#root:empty) {
+        margin: 0;
+        overflow: auto;
+        background: #f8f9f4;
+      }
+      #rabbit-webfetch {
+        box-sizing: border-box;
+        max-width: 42rem;
+        margin: auto;
+        padding: 1.5rem;
+        color: #26332c;
+        font:
+          1rem/1.55 system-ui,
+          sans-serif;
+        overflow-wrap: anywhere;
+      }
     </style>
   </head>
 
   <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript> You need to enable JavaScript to run this app. </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
+    <main id="rabbit-webfetch">
+      <h1>Rabbit</h1>
+      <noscript>Enable JavaScript to sign in and use Rabbit.</noscript>
+      <h2>Use Rabbit Goals with WebFetch</h2>
+      <p>
+        Ask the user for a goal ID and a Rabbit WebFetch token. They can sign in
+        and open Goals, select the goal, then choose Goal options → Share with
+        WebFetch → Create WebFetch token → Copy WebFetch access. The token
+        starts with <code>rg_</code>, works for one goal, and expires after 15
+        minutes. Handle it privately and leave it out of replies and shared
+        files.
+      </p>
+      <h3>Read a goal</h3>
+      <p>
+        WebFetch
+        <code>/api/agent/goals?goalId=GOAL_ID&amp;token=WEBFETCH_TOKEN</code> on
+        this same origin. The JSON includes the goal and up to 10 tasks. If
+        <code>nextOffset</code> is a number, add
+        <code>&amp;offset=NEXT_OFFSET</code> to fetch more.
+      </p>
+      <h3>Suggest a new task</h3>
+      <p>
+        WebFetch
+        <code
+          >/api/agent/goal-suggestions?goalId=GOAL_ID&amp;token=WEBFETCH_TOKEN&amp;description=TASK_TEXT</code
+        >
+        on this same origin. URL-encode each value. Use one task description of
+        up to 500 characters per call. Resolve the returned
+        <code>reviewPath</code>
+        against this origin and give the full review link to the user. They sign
+        in, review the task and choose Add task to goal to save it.
+      </p>
+    </main>
   </body>
 </html>

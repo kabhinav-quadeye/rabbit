@@ -20,6 +20,7 @@ import {
   readJsonBody as body,
   serveAgent,
   type AgentKeyStore,
+  type AgentEndpoint,
 } from "./agent-api.ts";
 import type { State } from "../src/types.ts";
 
@@ -30,6 +31,13 @@ type Options = {
   staticDir?: string;
   firebaseAgentConfig?: FirebaseOptions;
 };
+const agentRoutes = new Map<string, AgentEndpoint>([
+  ["/api/mcp", "mcp"],
+  ["/api/agent/connection", "connection"],
+  ["/api/agent/goals", "goals"],
+  ["/api/agent/goal-suggestions", "goal-suggestions"],
+]);
+
 export function createApi(options: Options = {}) {
   const firebaseAgent =
     options.firebaseAgentConfig &&
@@ -132,11 +140,12 @@ export function createApi(options: Options = {}) {
       res.end(JSON.stringify(data));
     };
     try {
-      if (path === "/api/mcp" || path === "/api/agent/connection") {
+      const agentRoute = agentRoutes.get(path);
+      if (agentRoute) {
         await serveAgent(
           req,
           res,
-          path === "/api/mcp" ? "mcp" : "connection",
+          agentRoute,
           firebaseAgent?.keys ?? localKeys,
           firebaseAgent
             ? (req) => firebaseAgent.authenticate(req.headers.authorization)
@@ -145,6 +154,8 @@ export function createApi(options: Options = {}) {
             ((id) => ({
               search: (query) => service.search(id, query),
               goals: () => service.goalsOverview(id),
+              goal: (goalId, includeTasks) =>
+                service.goalSnapshot(id, goalId, includeTasks),
               propose: (kind, args) => {
                 const proposals = state.agentProposals ?? [];
                 if (proposals.filter((p) => p.ownerId === id).length >= 50)

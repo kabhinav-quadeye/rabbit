@@ -4,11 +4,17 @@ import { z } from "zod";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { AppError } from "./domain.ts";
 import type { AgentProposal } from "../src/agent.ts";
-import type { GoalsOverview, Post } from "../src/types.ts";
+import type { Goal, GoalTask, GoalsOverview, Post } from "../src/types.ts";
 
 export type AgentTools = {
   search(query: string): Post[] | Promise<Post[]>;
   goals(): GoalsOverview | Promise<GoalsOverview>;
+  goal(
+    goalId: string,
+    includeTasks: boolean,
+  ):
+    | { goal: Goal; tasks: GoalTask[] }
+    | Promise<{ goal: Goal; tasks: GoalTask[] }>;
   propose(
     kind: AgentProposal["kind"],
     input: { title: string; body?: string; why?: string },

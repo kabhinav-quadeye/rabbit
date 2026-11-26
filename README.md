@@ -115,6 +115,17 @@ Local credentials/configuration, databases, generated exports, and test evidence
 
 ## Connect an agent
 
+### WebFetch for goals
+
+On the web, open a goal and choose **Goal options → Share with WebFetch**. Create a token, copy WebFetch access, and paste it into a private conversation with your agent. The homepage contains instructions the agent can read without JavaScript.
+
+The token works exclusively for that goal and expires in 15 minutes. There is one active WebFetch token per account. You can revoke it in the same dialog. Fetch URLs may be recorded in agent history, so use this dedicated token and keep it private.
+
+- `GET /api/agent/goals?goalId=…&token=…` returns the goal and a page of tasks. Follow `nextOffset` with `&offset=…`.
+- `GET /api/agent/goal-suggestions?goalId=…&token=…&description=…` returns a review path without saving anything. Open the link, sign in to Rabbit, and select **Add task to goal** to save the suggested task.
+
+### MCP
+
 In Rabbit, open **Profile → Agent access** and select **Create key**. The key is shown once and expires after 30 days. Replacing or revoking it disables the existing key. Use a client that accepts Streamable HTTP and custom headers. Set the server URL shown in Rabbit and the header `Authorization: Bearer <agent key>`. Keep the key in your client's secret storage. Use HTTPS outside local development.
 
 Rabbit exposes four MCP tools.
